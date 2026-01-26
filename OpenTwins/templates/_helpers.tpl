@@ -117,6 +117,7 @@ Get the full name of the InfluxDB2 sub chart.
   {{- end -}}
 {{- end -}}
 
+
 {{/*
 Get the full name of the MongoDB sub chart.
 */}}
@@ -135,3 +136,14 @@ Get the full name of Extended API.
 {{- define "opentwins.extendedAPI.fullname" -}}
   {{- printf "%s-ditto-extended-api" .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- end -}}
+
+{{/* Common labels */}}
+{{- define "kafkaml.labels" -}}
+app.kubernetes.io/name: kafkaml
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{/* Base name with kafkaml middle part */}}
+{{- define "kafkaml.fullname" -}}
+{{- printf "%s-kafkaml-%s" .Release.Name .Component -}}
+{{- end }}

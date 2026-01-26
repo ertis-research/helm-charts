@@ -1,0 +1,28 @@
+## helm install testotv2 .\OpenTwins\ -f .\tests\opentwins-values.yaml
+
+ditto:
+  nginx:
+    service:
+      nodePort: 31525
+
+mosquitto:
+  service:
+    nodePort: 31511
+
+influxdb2:
+  service:
+    nodePort: 31716
+
+grafana:
+  service:
+    nodePort: 31718
+
+mongodb:
+  service:
+    nodePorts:
+      mongodb: 31717
+
+extendedAPI:
+  service:
+    nodePort: 31526
+

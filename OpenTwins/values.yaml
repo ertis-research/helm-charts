@@ -12,7 +12,6 @@ example:
   enabled: true
 
 
-
 # Persistent volumes
 # Enabling these persistent volumes or not will depend on how your Kubernetes cluster works. 
 # In our case, the cluster creates them automatically, so we don't need to activate them. 
@@ -155,9 +154,61 @@ mosquitto:
 ##################################################################
 kafka:
   enabled: false
-  autoCreateTopicsEnable: true
-  
 
+strimzi-kafka-operator:
+  enabled: false
+  installCRDs: true
+
+# OpenTwins recommended values for Kafka-ML
+##################################################################
+kafkaml:
+  enabled: false
+  image:
+    repository: ertis
+    pullPolicy: Always
+    tag: "master"
+
+  # Service Configuration
+  # You can change type to NodePort, ClusterIP or LoadBalancer for each
+  services:
+    backend:
+      type: NodePort
+      port: 8000
+      nodePort: 30527
+    frontend:
+      type: LoadBalancer
+      port: 80
+      nodePort: 
+    pthexecutor:
+      type: ClusterIP
+      port: 8002
+      nodePort: 
+    tfexecutor:
+      type: ClusterIP
+      port: 8001
+      nodePort: 
+
+  # Infrastructure & App Config
+  brokers: ""
+  debug: "true"
+  config:
+    controlTopic: "KAFKA_ML_CONTROL_TOPIC"
+    modelLoggerTopic: "FEDERATED_MODEL_CONTROL_TOPIC"
+    frontendUrl: "http://localhost"
+    backendAllowedHosts: "127.0.0.1,localhost"
+
+  # Blockchain
+  blockchain:
+    enable: "0"
+    rpcUrl: "http://blockchain:8000"
+    chainId: "1337"
+    networkId: "1999"
+    walletAddress: "0x0"
+    walletKey: "ffff"
+    blockscoutUrl: "http://blockscout:8000"
+    tokenName: "KafkaML-FedToken"
+    tokenSymbol: "KFKMLA"
+    
 
 # OpenTwins recommended values for Telegraf
 ##################################################################
@@ -245,7 +296,7 @@ grafana:
         set -euo pipefail
         mkdir -p /grafana-storage/plugins
         cd /grafana-storage/plugins
-        wget --no-cache --no-check-certificate -O ertis-opentwins-app.zip https://github.com/ertis-research/opentwins-in-grafana/releases/download/2.0.0/ertis-opentwins-app.zip
+        wget --no-cache --no-check-certificate -O ertis-opentwins-app.zip https://github.com/ertis-research/opentwins-in-grafana/releases/download/latest/ertis-opentwins-app.zip
         unzip -o ertis-opentwins-app.zip
         rm ertis-opentwins-app.zip
         wget --no-cache --no-check-certificate -O ertis-unity-panel.zip https://github.com/ertis-research/grafana-panel-unity/releases/download/latest/ertis-unity-panel.zip
@@ -372,33 +423,3 @@ extendedAPI:
 #    uri: mongodb://localhost:30185/policies
       
 
-
-# OpenTwins recommended values for ERTIS MongoDB 
-##################################################################
-# OpenTwins-MongoDB:
-#   enabled: false # Value added by OpenTwins to indicate if this component should be installed or not
-#   nameOverride: mongodb
-#   auth:
-#     enabled: false
-#   securityContext:
-#     enabled: false
-#   persistence:
-#     enabled: false
-#   metadata:
-#     labels:
-#       app: database
-#       selector: mongodb
-#   service:
-#     type: NodePort
-#     nodePort: 30718
-#   spec:
-#     containers:
-#     - name: mongodb
-#       image:
-#         repository: mongo
-#         tag: 4.4.6
-      # env:
-      #   - name: MONGO_INITDB_ROOT_USERNAME
-      #     value: admin
-      #   - name: MONGO_INITDB_ROOT_PASSWORD
-      #     value: password
