@@ -150,16 +150,16 @@ mosquitto:
 
 
 
-# OpenTwins recommended values for Kafka
+# OpenTwins recommended values for Kafka (DO NOT USE, IN DEVELOPMENT)
 ##################################################################
 kafka:
   enabled: false
 
-strimzi-kafka-operator:
+strimzi-kafka-operator: #(DO NOT USE, IN DEVELOPMENT)
   enabled: false
   installCRDs: true
 
-# OpenTwins recommended values for Kafka-ML
+# OpenTwins recommended values for Kafka-ML (DO NOT USE, IN DEVELOPMENT)
 ##################################################################
 kafkaml:
   enabled: false

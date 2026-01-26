@@ -1,3 +1,5 @@
+{{- if and .Values.kafka.enabled }}
+{{/*
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaNodePool
 metadata:
@@ -45,3 +47,5 @@ spec:
   entityOperator:
     topicOperator: {}
     userOperator: {}
+*/}}
+{{- end }}
