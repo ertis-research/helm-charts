@@ -15,7 +15,7 @@ dependencies:
       - essencial
   # - name: OpenTwins-MongoDB
   #   version: ~0.1.0
-  #   repository: "https://ertis-research.github.io/Helm-charts/"
+  #   repository: "https://ertis-research.github.io/helm-charts/"
   #   condition: OpenTwins-MongoDB.enabled
   #   tags:
   #     - mongodb
@@ -43,7 +43,7 @@ dependencies:
       - essencial
   - name: mosquitto
     version: ~0.3.1
-    repository: "https://ertis-research.github.io/Helm-charts/"
+    repository: "https://ertis-research.github.io/helm-charts/"
     condition: mosquitto.enabled 
     tags:
       - mosquitto

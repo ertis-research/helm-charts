@@ -2,7 +2,7 @@
 ## Instalation
 First of all, you have to add our repository to your helm repository list:
 ```bash
-helm repo add Ertis https://ertis-research.github.io/Helm-charts/
+helm repo add Ertis https://ertis-research.github.io/helm-charts/
 ```
 
 Once done, the next step is installing the chart by executing this line on your terminal (in our case, we will use `ot` as release name and `digitaltwins` as namespace, but you can choose the one that you prefeer):

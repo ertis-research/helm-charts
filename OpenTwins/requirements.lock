@@ -13,12 +13,12 @@ dependencies:
   version: 2.1.2
 - name: telegraf
   repository: https://helm.influxdata.com/
-  version: 1.8.66
+  version: 1.8.76
 - name: mosquitto
-  repository: https://ertis-research.github.io/Helm-charts/
+  repository: https://ertis-research.github.io/helm-charts/
   version: 0.3.1
 - name: hono
   repository: https://eclipse.org/packages/charts/
-  version: 2.6.6
-digest: sha256:41a9f1e0fa50f5197c73dbb130b27c41e352d3e582a833036bc552097a457a40
-generated: "2026-01-26T18:23:44.4579643+01:00"
+  version: 2.7.1
+digest: sha256:5be82e4eceb13a6a044ba8c48fa2b0bfdec30414449eb63c667faa47f4dfd9d7
+generated: "2026-09-10T12:39:51.2490852+02:00"

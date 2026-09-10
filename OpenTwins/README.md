@@ -14,7 +14,7 @@
 First of all, you have to add ERTIS Research group helm repository to your helm repository list:
 
 ```bash
-helm repo add ertis https://ertis-research.github.io/Helm-charts/
+helm repo add ertis https://ertis-research.github.io/helm-charts/
 helm repo update
 ```
 
