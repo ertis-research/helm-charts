@@ -1,0 +1,30 @@
+dependencies:
+- name: grafana
+  repository: https://grafana-community.github.io/helm-charts
+  version: 13.2.4
+- name: app-template
+  repository: https://bjw-s-labs.github.io/helm-charts/
+  version: 5.1.0
+- name: redpanda
+  repository: https://charts.redpanda.com
+  version: 26.2.3
+- name: dgraph
+  repository: https://charts.dgraph.io
+  version: 24.1.4
+- name: redis
+  repository: oci://registry-1.docker.io/cloudpirates
+  version: 0.34.32
+- name: timescaledb
+  repository: oci://registry-1.docker.io/cloudpirates
+  version: 0.13.10
+- name: dapr
+  repository: https://dapr.github.io/helm-charts/
+  version: 1.18.4
+- name: kafka-ui
+  repository: https://kafbat.github.io/helm-charts
+  version: 1.6.5
+- name: dapr-dashboard
+  repository: https://dapr.github.io/helm-charts/
+  version: 0.15.0
+digest: sha256:b3441a7df6059fbc73821b7047ddeccad6c4b9f65a38afa4bf08722e73c0f383
+generated: "2026-09-15T12:25:11.2521366+02:00"

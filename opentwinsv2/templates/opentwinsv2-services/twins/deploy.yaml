@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "opentwinsv2.fullname" . }}-twins
+  labels:
+    {{- include "opentwinsv2.labels" . | nindent 4 }}
+    app.kubernetes.io/component: twins
+spec:
+  replicas: {{ .Values.opentwinsv2.twins.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "opentwinsv2.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: twins
+  template:
+    metadata:
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-port: "8080"
+        dapr.io/app-id: {{ .Values.opentwinsv2.twins.dapr.appId | default (printf "%s-twins-service" (include "opentwinsv2.fullname" .)) | quote }}
+        dapr.io/config: {{ .Values.opentwinsv2.twins.dapr.config | default (printf "%s-dapr-config" (include "opentwinsv2.fullname" .)) | quote }}
+      labels:
+        {{- include "opentwinsv2.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: twins
+    spec:
+      containers:
+        - name: opentwinsv2-twins
+          image: "{{ .Values.opentwinsv2.twins.image.repository }}:{{ .Values.opentwinsv2.twins.image.tag }}"
+          imagePullPolicy: {{ .Values.opentwinsv2.twins.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.opentwinsv2.twins.service.targetPort | default 8080 }}
+          env:
+            - name: ASPNETCORE_URLS
+              value: "http://+:{{ .Values.opentwinsv2.twins.service.targetPort | default 8080 }}"
+            - name: DGraph__URL_gRPC
+              value: "{{ .Release.Name }}-dgraph-dgrap-alpha.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.dgraph.alpha.service.grpcPort | default 9080 }}"
+            - name: DGraph__URL_HTTP
+              value: "{{ .Release.Name }}-dgraph-dgrap-alpha.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.dgraph.alpha.service.httpPort | default 8080 }}"
+            {{- if .Values.opentwinsv2.twins.extraEnv }}
+            {{- toYaml .Values.opentwinsv2.twins.extraEnv | nindent 12 }}
+            {{- end }}

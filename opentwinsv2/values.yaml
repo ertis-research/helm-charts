@@ -1,0 +1,222 @@
+opentwinsv2:
+  connectionString: ""
+
+  events:
+    replicaCount: 1
+    
+    image:
+      repository: docker.ertis.uma.es/opentwinsv2-release/opentwinsv2-events
+      tag: "0.0.1"
+      pullPolicy: Always
+
+    service:
+      type: NodePort
+      port: 80           
+      targetPort: 8080    
+      nodePort: 32095
+
+    dapr:
+      appId: ""
+      config: ""
+
+    extraEnv: []
+    # - name: OTRA_VARIABLE
+    #   value: "mi-valor"
+
+  things:
+    replicaCount: 1
+    
+    image:
+      repository: docker.ertis.uma.es/opentwinsv2-release/opentwinsv2-things
+      tag: "0.0.1"
+      pullPolicy: Always
+
+    service:
+      type: NodePort
+      port: 80           
+      targetPort: 8080    
+      nodePort: 32096
+
+    dapr:
+      appId: ""
+      config: ""
+
+    extraEnv: []
+    # - name: OTRA_VARIABLE
+    #   value: "mi-valor"
+
+  twins:
+    replicaCount: 1
+      
+    image:
+      repository: docker.ertis.uma.es/opentwinsv2-release/opentwinsv2-twins
+      tag: "0.0.1"
+      pullPolicy: Always
+
+    service:
+      type: NodePort
+      port: 80           
+      targetPort: 8080    
+      nodePort: 32097
+
+    dapr:
+      appId: ""
+      config: ""
+
+    extraEnv: []
+    # - name: OTRA_VARIABLE
+    #   value: "mi-valor"
+    
+  orchestration:
+    replicaCount: 1
+      
+    image:
+      repository: docker.ertis.uma.es/opentwinsv2-release/opentwinsv2-orchestration
+      tag: "0.0.1"
+      pullPolicy: Always
+
+    service:
+      type: NodePort
+      port: 80           
+      targetPort: 8080    
+      nodePort: 32098
+
+    dapr:
+      appId: ""
+      config: ""
+
+    extraEnv: []
+    # - name: OTRA_VARIABLE
+    #   value: "mi-valor"
+
+
+redpanda:
+  fullnameOverride: opentwinsv2-redpanda
+  tls:
+    enabled: false
+  external:
+    enabled: true
+    type: NodePort
+  # Configuration for local deployments
+    addresses:
+    - localhost # Change this to your local IP address if you want to access Redpanda from other devices on the same network
+  console:
+    enabled: false
+  statefulset:
+    replicas: 1
+    podAntiAffinity:
+      type: soft
+  tuning:
+    tune_aio_events: false
+  resources:
+    cpu:
+      cores: 1
+    memory:
+      container:
+        min: 2Gi
+        max: 2Gi
+
+kafka-ui:
+  service:
+    type: NodePort
+  yamlApplicationConfig:
+    kafka:
+      clusters:
+        - name: opentwins-kafka
+          bootstrapServers: >
+            opentwinsv2-redpanda:9093
+    auth:
+      type: disabled
+    management:
+      health:
+        ldap:
+          enabled: false
+
+mosquitto:
+  enabled: true
+  global:
+    nameOverride: mosquitto
+  controllers:
+    mosquitto:
+      containers:
+        main:
+          image:
+            repository: eclipse-mosquitto
+            tag: 2.1.2-alpine         
+  service:
+    mosquitto:
+      controller: mosquitto
+      type: NodePort
+      ports:
+        mqtt:
+          port: 1883
+          nodePort: 31883
+  persistence:
+    data:
+      enabled: true
+      type: persistentVolumeClaim
+      accessMode: ReadWriteOnce
+      size: 1Gi
+      globalMounts:
+        - path: /mosquitto/data
+    config:
+      enabled: true
+      type: configMap
+      name: opentwinsv2-mosquitto-config
+      globalMounts:
+        - path: /mosquitto/config/mosquitto.conf
+          subPath: mosquitto.conf
+          readOnly: true
+
+dgraph:
+  enabled: true
+  zero:
+    service:
+      type: NodePort
+      nodePort: 32091
+  alpha:
+    acl:
+      enabled: false
+    encryption:
+      enabled: false
+    configFile:
+      config.yaml: |
+        security:
+          whitelist: 10.0.0.0/8,172.0.0.0/8,192.168.0.0/16
+    service:
+      type: NodePort
+      nodePort: 32092
+    persistentVolume:
+      enabled: true
+  ratel:
+    enabled: true
+    service:
+      type: NodePort
+      nodePort: 32093
+    
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  service:
+    type: NodePort
+    nodePort: "32094"
+
+timescaledb:
+  enabled: true
+  auth:
+    postgresPassword: "password"
+  secretKeys:
+    adminPasswordKey: "password"
+  service:
+    type: NodePort
+
+dapr:
+  enabled: true
+
+dapr-dashboard:
+  enabled: true
+  serviceType: NodePort
+
+grafana:
+  enabled: true

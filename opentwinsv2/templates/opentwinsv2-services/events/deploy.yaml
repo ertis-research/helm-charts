@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "opentwinsv2.fullname" . }}-events
+  labels:
+    {{- include "opentwinsv2.labels" . | nindent 4 }}
+    app.kubernetes.io/component: events
+spec:
+  replicas: {{ .Values.opentwinsv2.events.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "opentwinsv2.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: events
+  template:
+    metadata:
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-port: "8080"
+        dapr.io/app-id: {{ .Values.opentwinsv2.events.dapr.appId | default (printf "%s-events-service" (include "opentwinsv2.fullname" .)) | quote }}
+        dapr.io/config: {{ .Values.opentwinsv2.events.dapr.config | default (printf "%s-dapr-config" (include "opentwinsv2.fullname" .)) | quote }}
+      labels:
+        {{- include "opentwinsv2.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: events
+    spec:
+      containers:
+        - name: opentwinsv2-events
+          image: "{{ .Values.opentwinsv2.events.image.repository }}:{{ .Values.opentwinsv2.events.image.tag }}"
+          imagePullPolicy: {{ .Values.opentwinsv2.events.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.opentwinsv2.events.service.targetPort | default 8080 }}
+          env:
+            - name: ASPNETCORE_URLS
+              value: "http://+:{{ .Values.opentwinsv2.events.service.targetPort | default 8080 }}"
+            - name: PostgreSQL__connectionString
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "opentwinsv2.fullname" . }}-postgresql-connection-string
+                  key: postgresql-connection-string
+            {{- if .Values.opentwinsv2.events.extraEnv }}
+            {{- toYaml .Values.opentwinsv2.events.extraEnv | nindent 12 }}
+            {{- end }}

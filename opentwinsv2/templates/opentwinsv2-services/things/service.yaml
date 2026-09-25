@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "opentwinsv2.fullname" . }}-things
+  labels:
+    {{- include "opentwinsv2.labels" . | nindent 4 }}
+    app.kubernetes.io/component: things
+spec:
+  type: {{ .Values.opentwinsv2.things.service.type | default "ClusterIP" }}
+  selector:
+    {{- include "opentwinsv2.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: things
+  ports:
+    - port: {{ .Values.opentwinsv2.things.service.port | default 80 }}
+      targetPort: {{ .Values.opentwinsv2.things.service.targetPort | default 8080 }}
+      protocol: TCP
+      {{- if and .Values.opentwinsv2.things.service.nodePort (eq (.Values.opentwinsv2.things.service.type | default "ClusterIP") "NodePort") }}
+      nodePort: {{ .Values.opentwinsv2.things.service.nodePort }}
+      {{- end }}

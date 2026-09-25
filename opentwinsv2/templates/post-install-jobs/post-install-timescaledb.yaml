@@ -1,0 +1,59 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "opentwinsv2.fullname" . }}-timescaledb-init
+  labels:
+    {{- include "opentwinsv2.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "opentwinsv2.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: timescaledb-init
+          image: postgres:15-alpine
+          command:
+            - "/bin/sh"
+            - "-c"
+          args:
+            - |
+              echo "Waiting for TimescaleDB to become ready at $PGHOST:$PGPORT..."
+              until pg_isready -h $PGHOST -p $PGPORT -U $PGUSER; do
+                echo "Database unavailable. Retrying in 2 seconds..."
+                sleep 2
+              done
+              
+              echo "TimescaleDB is ready. Executing SQL scripts sequentially..."
+              
+              psql -h $PGHOST -p $PGPORT -U $PGUSER -d $PGDATABASE -f "/scripts/things-table.sql"
+              psql -h $PGHOST -p $PGPORT -U $PGUSER -d $PGDATABASE -f "/scripts/events-table.sql"
+              psql -h $PGHOST -p $PGPORT -U $PGUSER -d $PGDATABASE -f "/scripts/data-table.sql"
+              
+              echo "The database initialization has completed."
+          env:
+            - name: PGHOST
+              value: "{{ .Release.Name }}-timescaledb" 
+            - name: PGPORT
+              value: {{ .Values.timescaledb.service.port | quote }}
+            - name: PGUSER
+              value: "postgres"
+            - name: PGDATABASE
+              value: "postgres"
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.timescaledb.auth.existingSecret }}{{ .Values.timescaledb.auth.existingSecret | quote }}{{ else }}"{{ .Release.Name }}-timescaledb"{{ end }}
+                  key: {{ .Values.timescaledb.auth.secretKeys.adminPasswordKey | quote }}
+          volumeMounts:
+            - name: sql-scripts
+              mountPath: /scripts
+      volumes:
+        - name: sql-scripts
+          configMap:
+            name: {{ include "opentwinsv2.fullname" . }}-timescaledb-init

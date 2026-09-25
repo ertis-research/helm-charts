@@ -1,0 +1,9 @@
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: {{ include "opentwinsv2.fullname" . }}-dapr-config
+  labels:
+    {{- include "opentwinsv2.labels" . | nindent 4 }}
+spec:
+  tracing:
+    samplingRate: "0"

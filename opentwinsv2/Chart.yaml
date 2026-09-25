@@ -1,0 +1,75 @@
+apiVersion: v2
+name: opentwinsv2
+description: Scalable open-source platform for next-gen composite digital twins built on knowledge graphs and Web of Things standard.
+type: application
+
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates, including the app version.
+# Versions are expected to follow Semantic Versioning (https://semver.org/)
+version: 0.0.1
+appVersion: "0.0.1"
+
+dependencies:
+  - name: grafana
+    version: ~13.2.2
+    repository: "https://grafana-community.github.io/helm-charts"
+    condition: grafana.enabled
+    tags:
+      - grafana
+      - essencial
+  - name: app-template
+    version: ~5.1.0
+    repository: "https://bjw-s-labs.github.io/helm-charts/"
+    alias: mosquitto
+    condition: mosquitto.enabled
+    tags:
+      - mosquitto
+      - essencial
+  - name: redpanda
+    version: ~26.2.3
+    repository: "https://charts.redpanda.com"
+    condition: redpanda.enabled
+    alias: redpanda
+    tags:
+      - redpanda
+      - essencial
+  - name: dgraph
+    version: ~24.1.4
+    repository: https://charts.dgraph.io
+    condition: dgraph.enabled
+    tags:
+      - dgraph
+      - essencial
+  - name: redis
+    version: ~0.34.32
+    repository: "oci://registry-1.docker.io/cloudpirates"
+    condition: redis.enabled
+    tags:
+      - redis
+      - essencial
+  - name: timescaledb
+    version: ~0.13.10
+    repository: "oci://registry-1.docker.io/cloudpirates"
+    condition: timescaledb.enabled
+    tags:
+      - timescaledb
+      - essencial
+  - name: dapr
+    version: ~1.18.4
+    repository: "https://dapr.github.io/helm-charts/"
+    condition: dapr.enabled
+    tags:
+      - dapr
+      - essencial
+  - name: kafka-ui
+    version: ~1.6.5
+    repository: "https://kafbat.github.io/helm-charts"
+    condition: kafka-ui.enabled
+    tags:
+      - kafka-ui
+  - name: dapr-dashboard
+    version: ~0.15.0
+    repository: "https://dapr.github.io/helm-charts/"
+    condition: dapr-dashboard.enabled
+    tags:
+      - dapr-dashboard

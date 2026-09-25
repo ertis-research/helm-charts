@@ -1,0 +1,14 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: {{ include "opentwinsv2.fullname" . }}-kafka-pubsub
+  labels:
+    {{- include "opentwinsv2.labels" . | nindent 4 }}
+spec:
+  type: pubsub.kafka
+  version: v1
+  metadata:
+  - name: brokers
+    value: "opentwinsv2-redpanda.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.redpanda.listeners.kafka.port }}"
+  - name: authType
+    value: "none"

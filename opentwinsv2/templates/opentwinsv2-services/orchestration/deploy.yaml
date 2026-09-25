@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "opentwinsv2.fullname" . }}-orchestration
+  labels:
+    {{- include "opentwinsv2.labels" . | nindent 4 }}
+    app.kubernetes.io/component: orchestration
+spec:
+  replicas: {{ .Values.opentwinsv2.orchestration.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "opentwinsv2.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: orchestration
+  template:
+    metadata:
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-port: "8080"
+        dapr.io/app-id: {{ .Values.opentwinsv2.orchestration.dapr.appId | default (printf "%s-orchestration-service" (include "opentwinsv2.fullname" .)) | quote }}
+        dapr.io/config: {{ .Values.opentwinsv2.orchestration.dapr.config | default (printf "%s-dapr-config" (include "opentwinsv2.fullname" .)) | quote }}
+      labels:
+        {{- include "opentwinsv2.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: orchestration
+    spec:
+      serviceAccountName: {{ include "opentwinsv2.fullname" . }}-opentwinsv2-sa
+      containers:
+        - name: opentwinsv2-orchestration
+          image: "{{ .Values.opentwinsv2.orchestration.image.repository }}:{{ .Values.opentwinsv2.orchestration.image.tag }}"
+          imagePullPolicy: {{ .Values.opentwinsv2.orchestration.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.opentwinsv2.orchestration.service.targetPort | default 8080 }}
+          env:
+            - name: ASPNETCORE_URLS
+              value: "http://+:{{ .Values.opentwinsv2.orchestration.service.targetPort | default 8080 }}"
+            - name: PostgreSQL__connectionString
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "opentwinsv2.fullname" . }}-postgresql-connection-string
+                  key: postgresql-connection-string
+            - name: Dapr__Twins
+              value: {{ .Values.opentwinsv2.twins.dapr.appId | default (printf "%s-twins-service" (include "opentwinsv2.fullname" .)) | quote }}
+            - name: Dapr__Things
+              value: {{ .Values.opentwinsv2.things.dapr.appId | default (printf "%s-things-service" (include "opentwinsv2.fullname" .)) | quote }}
+            {{- if .Values.opentwinsv2.orchestration.extraEnv }}
+            {{- toYaml .Values.opentwinsv2.orchestration.extraEnv | nindent 12 }}
+            {{- end }}
