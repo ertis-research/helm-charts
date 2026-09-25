@@ -24,7 +24,7 @@ jobs:
       - name: Add repositories
         run: |
           for dir in $(ls -d ${{ env.CHARTS_DIR }}/*/); do
-            helm dependency list $dir 2> /dev/null | tail +2 | head -n -1 | grep -E 'https?://' | awk '{ print "helm repo add " $1 " " $3 }' | while read cmd; do $cmd; done
+            helm dependency list $dir 2> /dev/null | tail +2 | head -n -1 | grep -E 'https?://' | awk '{ print "helm repo add --force-update " $1 " " $3 }' | while read cmd; do eval $cmd; done
           done
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.6.0
