@@ -3,6 +3,77 @@ entries:
   OpenTwins:
   - apiVersion: v1
     appVersion: 0.5.0
+    created: "2026-09-25T12:00:16.940740923Z"
+    dependencies:
+    - condition: ditto.enabled
+      name: ditto
+      repository: oci://registry-1.docker.io/eclipse
+      tags:
+      - ditto
+      - essencial
+      version: 3.3.7
+    - condition: mongodb.enabled
+      name: mongodb
+      repository: oci://registry-1.docker.io/bitnamicharts
+      tags:
+      - mongodb
+      - essencial
+      version: ~13.18.5
+    - condition: grafana.enabled
+      name: grafana
+      repository: https://grafana-community.github.io/helm-charts/
+      tags:
+      - grafana
+      - essencial
+      version: ~13.2.2
+    - condition: influxdb2.enabled
+      name: influxdb2
+      repository: https://helm.influxdata.com/
+      tags:
+      - influxdb2
+      - essencial
+      version: ~2.1.1
+    - condition: telegraf.enabled
+      name: telegraf
+      repository: https://helm.influxdata.com/
+      tags:
+      - telegraf
+      - essencial
+      version: ^1.8.27
+    - condition: mosquitto.enabled
+      name: mosquitto
+      repository: https://ertis-research.github.io/helm-charts/
+      tags:
+      - mosquitto
+      - essencial
+      version: ~0.3.1
+    - condition: hono.enabled
+      name: hono
+      repository: https://eclipse.org/packages/charts/
+      tags:
+      - hono
+      - essencial
+      version: ^2.5.5
+    description: Esta es una plataforma de codigo abierto orientada a gemelos digitales.
+    digest: 32eb498b03510ba051fb81d4c54f2bc6d179b74b5ca20bd1f7e7a82b58dfb113
+    keywords:
+    - opentwins
+    - iot-package
+    - IoT
+    - digital twin
+    maintainers:
+    - email: sergioip@uma.es
+      name: sergioip
+    - email: juliarobles@uma.es
+      name: juliarobles
+    name: OpenTwins
+    sources:
+    - https://github.com/ertis-research/helm-charts
+    urls:
+    - https://github.com/ertis-research/helm-charts/releases/download/OpenTwins-0.6.5/OpenTwins-0.6.5.tgz
+    version: 0.6.5
+  - apiVersion: v1
+    appVersion: 0.5.0
     created: "2026-09-10T10:49:20.856981453Z"
     dependencies:
     - condition: ditto.enabled
@@ -2436,4 +2507,80 @@ entries:
     urls:
     - charts/mqtttomongo-1.0.0.tgz
     version: 1.0.0
-generated: "2026-09-10T10:49:21.014814937Z"
+  opentwinsv2:
+  - apiVersion: v2
+    appVersion: 0.0.1
+    created: "2026-09-25T12:00:17.223262712Z"
+    dependencies:
+    - condition: grafana.enabled
+      name: grafana
+      repository: https://grafana-community.github.io/helm-charts
+      tags:
+      - grafana
+      - essencial
+      version: ~13.2.2
+    - alias: mosquitto
+      condition: mosquitto.enabled
+      name: app-template
+      repository: https://bjw-s-labs.github.io/helm-charts/
+      tags:
+      - mosquitto
+      - essencial
+      version: ~5.1.0
+    - alias: redpanda
+      condition: redpanda.enabled
+      name: redpanda
+      repository: https://charts.redpanda.com
+      tags:
+      - redpanda
+      - essencial
+      version: ~26.2.3
+    - condition: dgraph.enabled
+      name: dgraph
+      repository: https://charts.dgraph.io
+      tags:
+      - dgraph
+      - essencial
+      version: ~24.1.4
+    - condition: redis.enabled
+      name: redis
+      repository: oci://registry-1.docker.io/cloudpirates
+      tags:
+      - redis
+      - essencial
+      version: ~0.34.32
+    - condition: timescaledb.enabled
+      name: timescaledb
+      repository: oci://registry-1.docker.io/cloudpirates
+      tags:
+      - timescaledb
+      - essencial
+      version: ~0.13.10
+    - condition: dapr.enabled
+      name: dapr
+      repository: https://dapr.github.io/helm-charts/
+      tags:
+      - dapr
+      - essencial
+      version: ~1.18.4
+    - condition: kafka-ui.enabled
+      name: kafka-ui
+      repository: https://kafbat.github.io/helm-charts
+      tags:
+      - kafka-ui
+      version: ~1.6.5
+    - condition: dapr-dashboard.enabled
+      name: dapr-dashboard
+      repository: https://dapr.github.io/helm-charts/
+      tags:
+      - dapr-dashboard
+      version: ~0.15.0
+    description: Scalable open-source platform for next-gen composite digital twins
+      built on knowledge graphs and Web of Things standard.
+    digest: b2b8ce28269b22f9b389a821fe4f943d84a46ac8d012911be703f03a9384e6d4
+    name: opentwinsv2
+    type: application
+    urls:
+    - https://github.com/ertis-research/helm-charts/releases/download/opentwinsv2-0.0.1/opentwinsv2-0.0.1.tgz
+    version: 0.0.1
+generated: "2026-09-25T12:00:17.223595694Z"
