@@ -4,7 +4,7 @@
         "location": "Spain",
         "description": "First test of digital twin, consisting of a raspberry pi with two DHT22 sensors connected.",
         "name": "Raspberry Pi 3B",
-        "image": "https://i.imgur.com/HamHoFU.jpg"
+        "image": "https://osoyoo.com/wp-content/uploads/2018/12/DHT22_example.jpg"
     },
     "features": {}
 }
