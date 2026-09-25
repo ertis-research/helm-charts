@@ -7,7 +7,7 @@ dependencies:
   version: 13.18.5
 - name: grafana
   repository: https://grafana-community.github.io/helm-charts/
-  version: 10.1.5
+  version: 13.2.5
 - name: influxdb2
   repository: https://helm.influxdata.com/
   version: 2.1.2
@@ -20,5 +20,5 @@ dependencies:
 - name: hono
   repository: https://eclipse.org/packages/charts/
   version: 2.7.1
-digest: sha256:e6c0d0e1cbf51fffcb99d4becf9ab367c8d43d5c42aa5397011721eb312fbfd1
-generated: "2026-09-25T13:06:56.4485049+02:00"
+digest: sha256:6d3e57bd073555d1a89bfc038301dea827d5da79d5e2a91f3840e11797bdbdb1
+generated: "2026-09-25T13:58:08.0930176+02:00"
