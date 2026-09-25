@@ -15,4 +15,4 @@ maintainers:
 name: OpenTwins
 sources:
   - https://github.com/ertis-research/helm-charts
-version: 0.6.4
+version: 0.6.5
