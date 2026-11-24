@@ -1,22 +1,27 @@
 # Helm charts
-ERTIS Research group Helm Chart repository
+ERTIS Research group Helm chart repository.
+
+```bash
+helm repo add ertis https://ertis-research.github.io/helm-charts/
+helm repo update
+```
 
 ---
 
-## Main helm chart list
-|Name                   |Chart version| Aplication version |
-|-----------------------|-------------|--------------------|
-|OpenTwins              |0.5.0        | Beta 0.1           |
-|OpenTwins Lightweight  |0.4.0        | Beta 0.1           |
+## Main Helm chart list
+| Name                  | Chart name              | Chart version | Application version |
+|-----------------------|-------------------------|---------------|---------------------|
+| OpenTwins v2          | `opentwinsv2`           | 0.0.3         | 0.0.1               |
+| OpenTwins             | `OpenTwins`             | 0.6.6         | 0.5.0               |
+| OpenTwins Lightweight | `OpenTwins-Lightweight` | 0.4.3         | 0.4.0               |
 
+## Utility Helm chart list
+| Name                  | Chart name              | Chart version | Application version |
+|-----------------------|-------------------------|---------------|---------------------|
+| OpenTwins MongoDB     | `OpenTwins-MongoDB`     | 0.1.0         | 4.4.6               |
+| MqttToMongo           | `mqtttomongo`           | 1.0.1         | latest              |
+| Mosquitto             | `mosquitto`             | 0.3.1         | 1.6.10              |
 
-
-## Utility helm chart list
-|Name                   |Chart version| Aplication version |
-|-----------------------|-------------|--------------------|
-|OpenTwins MongoDB      |0.1.0        | 4.4.6              |
-|MqttToMongo            |1.0.0        | 1.0                |
-|Mosquitto              |0.2.0        | 1.6.10             |
 ---
 
-For specific information about each helm, please visit its own README in this repository.
+For specific information about each chart, please refer to its own README in this repository.

@@ -3,7 +3,7 @@ appVersion: "latest"
 description: This application takes messages from MQTT server and save them into a MondoDB database
 
 name: mqtttomongo
-version: 1.0.0
+version: 1.0.1
 keywords:
   - message queue
   - MQTT
