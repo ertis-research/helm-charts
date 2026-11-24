@@ -3,6 +3,78 @@ entries:
   OpenTwins:
   - apiVersion: v1
     appVersion: 0.5.0
+    created: "2026-11-24T11:03:00.521402091Z"
+    dependencies:
+    - condition: ditto.enabled
+      name: ditto
+      repository: oci://registry-1.docker.io/eclipse
+      tags:
+      - ditto
+      - essencial
+      version: 3.3.7
+    - condition: mongodb.enabled
+      name: mongodb
+      repository: oci://registry-1.docker.io/bitnamicharts
+      tags:
+      - mongodb
+      - essencial
+      version: ~13.18.5
+    - condition: grafana.enabled
+      name: grafana
+      repository: https://grafana-community.github.io/helm-charts/
+      tags:
+      - grafana
+      - essencial
+      version: ~13.2.2
+    - condition: influxdb2.enabled
+      name: influxdb2
+      repository: https://helm.influxdata.com/
+      tags:
+      - influxdb2
+      - essencial
+      version: ~2.1.1
+    - condition: telegraf.enabled
+      name: telegraf
+      repository: https://helm.influxdata.com/
+      tags:
+      - telegraf
+      - essencial
+      version: ^1.8.27
+    - condition: mosquitto.enabled
+      name: mosquitto
+      repository: https://ertis-research.github.io/helm-charts/
+      tags:
+      - mosquitto
+      - essencial
+      version: ~0.3.1
+    - condition: hono.enabled
+      name: hono
+      repository: https://eclipse.org/packages/charts/
+      tags:
+      - hono
+      - essencial
+      version: ^2.5.5
+    description: Open-source platform for the development and management of digital
+      twins.
+    digest: 3066dcd2eb438e3c1e90ecafca3df86cb8fe7e081daeb9ae0bc6e3670c9e0691
+    keywords:
+    - opentwins
+    - iot-package
+    - IoT
+    - digital twin
+    maintainers:
+    - email: sergioip@uma.es
+      name: sergioip
+    - email: juliarobles@uma.es
+      name: juliarobles
+    name: OpenTwins
+    sources:
+    - https://github.com/ertis-research/helm-charts
+    urls:
+    - https://github.com/ertis-research/helm-charts/releases/download/OpenTwins-0.6.6/OpenTwins-0.6.6.tgz
+    version: 0.6.6
+  - apiVersion: v1
+    appVersion: 0.5.0
     created: "2026-09-25T12:00:16.940740923Z"
     dependencies:
     - condition: ditto.enabled
@@ -2328,6 +2400,39 @@ entries:
   OpenTwins-Lightweight:
   - apiVersion: v1
     appVersion: 0.4.0
+    created: "2026-11-24T11:03:00.715235511Z"
+    dependencies:
+    - name: mqtttomongo
+      repository: https://ertis-research.github.io/helm-charts/
+      version: ^1.0.0
+    - name: ditto
+      repository: oci://registry-1.docker.io/eclipse
+      version: ^3.3.2
+    - name: mosquitto
+      repository: https://ertis-research.github.io/helm-charts/
+      version: ^0.2.0
+    - name: OpenTwins-MongoDB
+      repository: https://ertis-research.github.io/helm-charts/
+      version: ^0.1.0
+    description: Lightweight version of OpenTwins, an open-source platform for the
+      development and management of digital twins.
+    digest: 5876eb5f2ccd91f91ef2795179ca850142b3e75b94a83d82f80c7b7489b840a3
+    keywords:
+    - iot-package
+    - IoT
+    - messaging
+    - digital twin
+    maintainers:
+    - email: sergioip@uma.es
+      name: sergioip
+    name: OpenTwins-Lightweight
+    sources:
+    - https://github.com/ertis-research/helm-charts
+    urls:
+    - https://github.com/ertis-research/helm-charts/releases/download/OpenTwins-Lightweight-0.4.3/OpenTwins-Lightweight-0.4.3.tgz
+    version: 0.4.3
+  - apiVersion: v1
+    appVersion: 0.4.0
     created: "2026-09-10T10:49:21.01457365Z"
     dependencies:
     - name: mqtttomongo
@@ -2490,6 +2595,23 @@ entries:
     - charts/mosquitto-0.2.0.tgz
     version: 0.2.0
   mqtttomongo:
+  - apiVersion: v2
+    appVersion: latest
+    created: "2026-11-24T11:03:01.300336984Z"
+    description: This application takes messages from MQTT server and save them into
+      a MondoDB database
+    digest: 8ae9a906a7de5bbf45675dcae9727936ed8575d448cd2e0f305d4d3bff85bcb9
+    keywords:
+    - message queue
+    - MQTT
+    - mosquitto
+    - eclipse-iot
+    - mongodb
+    name: mqtttomongo
+    type: application
+    urls:
+    - https://github.com/ertis-research/helm-charts/releases/download/mqtttomongo-1.0.1/mqtttomongo-1.0.1.tgz
+    version: 1.0.1
   - apiVersion: v2
     appVersion: latest
     created: "2023-04-21T09:46:26.464467+02:00"
@@ -2733,4 +2855,4 @@ entries:
     urls:
     - https://github.com/ertis-research/helm-charts/releases/download/opentwinsv2-0.0.1/opentwinsv2-0.0.1.tgz
     version: 0.0.1
-generated: "2026-10-09T11:26:57.641970721Z"
+generated: "2026-11-24T11:03:01.300488076Z"
