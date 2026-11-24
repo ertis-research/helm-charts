@@ -1,0 +1,177 @@
+{{- include "kmlops.validate" . }}
+{{- $backend := include "kmlops.databaseBackend" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kmlops.fullname" . }}
+  labels:
+    {{- include "kmlops.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  {{- if eq $backend "sqlite" }}
+  strategy:
+    # The SQLite volume is ReadWriteOnce and SQLite allows a single writer.
+    type: Recreate
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "kmlops.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/credentials: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "kmlops.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "kmlops.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: {{ include "kmlops.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            # MinIO (datasets)
+            - name: MINIO_URL
+              value: {{ include "kmlops.minio.endpoint" . | quote }}
+            - name: MINIO_SECURE
+              value: {{ include "kmlops.minio.secure" . | quote }}
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kmlops.minio.secretName" . }}
+                  key: {{ include "kmlops.minio.accessKeyKey" . }}
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kmlops.minio.secretName" . }}
+                  key: {{ include "kmlops.minio.secretKeyKey" . }}
+            - name: BUCKET_NAME
+              value: {{ required "bucketName is required" .Values.bucketName | quote }}
+            # Kubernetes (training Jobs)
+            - name: KUBERNETES_NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+            - name: TRAINING_IMAGE
+              value: {{ .Values.training.image | quote }}
+            - name: TRAINING_JOB_TTL_SECONDS
+              value: {{ .Values.training.jobTtlSeconds | quote }}
+            - name: TRAINING_JOB_BACKOFF_LIMIT
+              value: {{ .Values.training.backoffLimit | quote }}
+            {{- with .Values.training.mlflowVersion }}
+            - name: TRAINING_MLFLOW_VERSION
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.training.minioVersion }}
+            - name: TRAINING_MINIO_VERSION
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.training.extraPipPackages }}
+            - name: TRAINING_PIP_EXTRA_PACKAGES
+              value: {{ join "," . | quote }}
+            {{- end }}
+            # The training Jobs read the MinIO credentials from this Secret (secretKeyRef),
+            # so they are never copied in plain text into the Job spec.
+            - name: MINIO_CREDENTIALS_SECRET
+              value: {{ include "kmlops.minio.secretName" . | quote }}
+            - name: MINIO_CREDENTIALS_ACCESS_KEY_KEY
+              value: {{ include "kmlops.minio.accessKeyKey" . | quote }}
+            - name: MINIO_CREDENTIALS_SECRET_KEY_KEY
+              value: {{ include "kmlops.minio.secretKeyKey" . | quote }}
+            # MLflow
+            - name: MLFLOW_TRACKING_URI
+              value: {{ include "kmlops.mlflow.trackingUri" . | quote }}
+            # Training status
+            - name: STATUS_POLL_INTERVAL_SECONDS
+              value: {{ .Values.status.pollIntervalSeconds | quote }}
+            - name: LAUNCH_TIMEOUT_SECONDS
+              value: {{ .Values.status.launchTimeoutSeconds | quote }}
+            # Training store
+            - name: DB_BACKEND
+              value: {{ $backend | quote }}
+            {{- if eq $backend "sqlite" }}
+            - name: SQLITE_PATH
+              value: /data/kmlops.db
+            {{- else }}
+            - name: POSTGRES_HOST
+              value: {{ include "kmlops.postgres.host" . | quote }}
+            - name: POSTGRES_PORT
+              value: {{ include "kmlops.postgres.port" . | quote }}
+            - name: POSTGRES_DB
+              value: {{ include "kmlops.postgres.database" . | quote }}
+            - name: POSTGRES_USER
+              value: {{ include "kmlops.postgres.user" . | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kmlops.postgres.secretName" . }}
+                  key: {{ include "kmlops.postgres.passwordKey" . }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            {{- if eq $backend "sqlite" }}
+            - name: data
+              mountPath: /data
+            {{- end }}
+            {{- with .Values.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        {{- if eq $backend "sqlite" }}
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "kmlops.dataClaimName" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- end }}
+        {{- with .Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

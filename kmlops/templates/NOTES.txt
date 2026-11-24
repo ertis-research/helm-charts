@@ -1,0 +1,44 @@
+kMLOps has been deployed in namespace {{ .Release.Namespace }}.
+
+1. Access the kMLOps API (interactive documentation at /docs):
+{{- if .Values.httpRoute.enabled }}
+  The API is exposed through the HTTPRoute {{ include "kmlops.fullname" . }}.
+  {{- range .Values.httpRoute.hostnames }}
+  http://{{ . }}/docs
+  {{- end }}
+{{- else if .Values.ingress.enabled }}
+{{- range $host := .Values.ingress.hosts }}
+  {{- range .paths }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
+  {{- end }}
+{{- end }}
+{{- else if contains "NodePort" .Values.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "kmlops.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT/docs
+{{- else if contains "LoadBalancer" .Values.service.type }}
+  It may take a few minutes for the LoadBalancer address to be available. Watch it with:
+    kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "kmlops.fullname" . }}
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "kmlops.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo http://$SERVICE_IP:{{ .Values.service.port }}/docs
+{{- else }}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "kmlops.fullname" . }} 8000:{{ .Values.service.port }}
+  Then open http://localhost:8000/docs
+{{- end }}
+
+2. Configuration summary:
+  - Training store: {{ include "kmlops.databaseBackend" . }}{{ if .Values.postgres.enabled }} (bundled PostgreSQL {{ include "kmlops.postgres.fullname" . }}){{ end }}
+  - MinIO: {{ include "kmlops.minio.endpoint" . }}{{ if .Values.minio.enabled }} (bundled){{ else }} (external){{ end }}, dataset bucket "{{ .Values.bucketName }}"
+  - MLflow: {{ include "kmlops.mlflow.trackingUri" . | default "disabled (only local trainings are tracked)" }}{{ if .Values.mlflow.enabled }} (bundled, artifacts in bucket "{{ .Values.mlflow.artifactsBucket }}"){{ end }}
+  - Training Jobs run in namespace {{ .Release.Namespace }} with image {{ .Values.training.image }}
+{{- if .Values.mlflow.enabled }}
+
+3. Access the bundled MLflow UI:
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "kmlops.mlflow.fullname" . }} 5000:{{ .Values.mlflow.service.port }}
+  Then open http://localhost:5000
+{{- end }}
+{{- if .Values.minio.enabled }}
+
+Retrieve the bundled MinIO root password with:
+  kubectl --namespace {{ .Release.Namespace }} get secret {{ include "kmlops.minio.secretName" . }} -o jsonpath="{.data.{{ include "kmlops.minio.secretKeyKey" . }}}" | base64 -d
+{{- end }}

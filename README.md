@@ -12,6 +12,7 @@ helm repo update
 | Name                  | Chart name              | Chart version | Application version |
 |-----------------------|-------------------------|---------------|---------------------|
 | OpenTwins v2          | `opentwinsv2`           | 0.0.3         | 0.0.1               |
+| kMLOps                | `kmlops`                | 0.0.1         | 0.0.1               |
 | OpenTwins             | `OpenTwins`             | 0.6.6         | 0.5.0               |
 | OpenTwins Lightweight | `OpenTwins-Lightweight` | 0.4.3         | 0.4.0               |
 

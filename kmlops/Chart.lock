@@ -1,0 +1,9 @@
+dependencies:
+- name: minio
+  repository: oci://registry-1.docker.io/cloudpirates
+  version: 0.14.0
+- name: postgres
+  repository: oci://registry-1.docker.io/cloudpirates
+  version: 0.22.1
+digest: sha256:261a1dac68c7d1095e205f5b3057c4ac1cc429b3eea02d24db96b3c3f0d63bcb
+generated: "2026-11-24T13:46:20.9974559+02:00"

@@ -1,0 +1,328 @@
+# Default values for kmlops.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# -- Number of kMLOps API replicas.
+# Must be `1` when `database.backend` is `sqlite` (SQLite allows a single writer and the data volume is `ReadWriteOnce`);
+# rendering fails otherwise. Use `postgres` as the training store to run more than one replica.
+replicaCount: 1
+
+image:
+  # -- Container image repository of the kMLOps API.
+  repository: docker.ertis.uma.es/kmlops/kmlops
+  # -- Image pull policy.
+  # `IfNotPresent` pulls the image only if it is not cached on the node, `Always` pulls it on every pod start,
+  # and `Never` only uses an image already present on the node.
+  pullPolicy: IfNotPresent
+  # -- Image tag. Leave empty to use the chart `appVersion`.
+  tag: ""
+
+# -- References to Secrets of type `kubernetes.io/dockerconfigjson` used to pull the kMLOps image from a private registry.
+# Example: `[{name: my-registry-credentials}]`. The Secrets must already exist in the release namespace.
+imagePullSecrets: []
+# -- Overrides the chart name used in resource names and the `app.kubernetes.io/name` label.
+nameOverride: ""
+# -- Fully overrides the name of the resources created by this chart (Deployment, Service, Role, PVC...).
+fullnameOverride: ""
+
+serviceAccount:
+  # -- Create a dedicated ServiceAccount for kMLOps. kMLOps uses it to create and watch the training Jobs,
+  # so it must be bound to the Role created when `rbac.create` is `true`.
+  create: true
+  # -- Mount the ServiceAccount API token in the pod. Must stay `true`: kMLOps calls the Kubernetes API with it.
+  automount: true
+  # -- Annotations added to the ServiceAccount.
+  annotations: {}
+  # -- Name of the ServiceAccount. If empty and `serviceAccount.create` is `true`, a name is generated from the
+  # release name. If `serviceAccount.create` is `false`, this existing ServiceAccount is used (or `default` if empty).
+  name: ""
+
+rbac:
+  # -- Create a Role and RoleBinding in the release namespace that allow the ServiceAccount to create, get, list,
+  # watch and delete Jobs, and to read pods and their logs. Without these permissions kMLOps cannot launch,
+  # monitor or cancel trainings. Set to `false` only if equivalent permissions are granted elsewhere.
+  create: true
+
+# -- Annotations added to the kMLOps pod.
+podAnnotations: {}
+# -- Labels added to the kMLOps pod.
+podLabels: {}
+
+# -- Pod-level security context (e.g. `fsGroup`, `runAsUser`). Empty by default because the image runs as root;
+# set `fsGroup` if you run it as a non-root user so it can write to the data volume.
+podSecurityContext: {}
+
+# -- Container-level security context (e.g. `capabilities`, `readOnlyRootFilesystem`, `runAsNonRoot`).
+# Note that kMLOps writes its SQLite database under `/data` and Python caches inside the container.
+securityContext: {}
+
+service:
+  # -- Kubernetes Service type used to expose the kMLOps API.
+  # `ClusterIP` exposes it only inside the cluster, `NodePort` also exposes it on every node using `service.nodePort`,
+  # and `LoadBalancer` requests an external load balancer from the cloud provider.
+  type: ClusterIP
+  # -- Service port. The API container always listens on port 8000.
+  port: 8000
+  # -- Node port used when `service.type` is `NodePort` or `LoadBalancer`. Leave empty to let Kubernetes assign one.
+  nodePort: ""
+
+ingress:
+  # -- Create an Ingress for the kMLOps API. Requires an ingress controller in the cluster and at least one entry in `ingress.hosts`.
+  enabled: false
+  # -- Ingress class name (e.g. `nginx`, `traefik`). Leave empty to use the cluster default class.
+  className: ""
+  # -- Annotations added to the Ingress (e.g. for the ingress controller or cert-manager).
+  annotations: {}
+  # -- Hosts and paths routed to the API. Each entry has `host` and a list of `paths` with `path` and `pathType`
+  # (`Prefix`, `Exact` or `ImplementationSpecific`). Example: `[{host: kmlops.example.org, paths: [{path: /, pathType: Prefix}]}]`.
+  hosts: []
+  # -- TLS configuration. Each entry has `secretName` (an existing TLS Secret) and the list of `hosts` it covers.
+  tls: []
+
+httpRoute:
+  # -- Create a Gateway API HTTPRoute for the kMLOps API. Requires the Gateway API CRDs and an existing Gateway referenced in `httpRoute.parentRefs`.
+  enabled: false
+  # -- Annotations added to the HTTPRoute.
+  annotations: {}
+  # -- Gateways this route is attached to. Each entry has `name` and optionally `namespace` and `sectionName`.
+  parentRefs: []
+  # -- Hostnames matched by the route. Leave empty to match any hostname accepted by the Gateway.
+  hostnames: []
+  # -- Routing rules. Each rule has a list of `matches` and optional `filters`; all rules are sent to the kMLOps Service.
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+
+# -- CPU and memory requests and limits of the kMLOps API container. Training workloads run in separate Jobs and are not affected.
+# Example: `{requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}`.
+resources: {}
+
+# -- Liveness probe of the API container. The kMLOps root endpoint `/` returns HTTP 200 when the API is running.
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 20
+  failureThreshold: 3
+# -- Readiness probe of the API container.
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+
+# -- Additional environment variables for the API container, as a list of Kubernetes `EnvVar` objects (`name`/`value` or `valueFrom`).
+extraEnv: []
+
+# -- Additional volumes for the kMLOps pod.
+volumes: []
+# -- Additional volume mounts for the API container.
+volumeMounts: []
+
+# -- Node labels used to schedule the kMLOps pod.
+nodeSelector: {}
+# -- Tolerations of the kMLOps pod.
+tolerations: []
+# -- Affinity rules of the kMLOps pod.
+affinity: {}
+
+training:
+  # -- Container image used by the training Jobs. It must contain Ludwig; the Job installs pinned versions of `minio`
+  # and `mlflow` (plus `training.extraPipPackages`) with pip at start-up, so the training pods need access to a Python package index.
+  image: ludwigai/ludwig:0.17
+  # -- Seconds after which Kubernetes deletes finished training Jobs and their pods. `0` deletes them immediately.
+  jobTtlSeconds: 60
+  # -- Number of retries of a failed training pod before the Job is marked as failed.
+  backoffLimit: 1
+  # -- Version of the `mlflow` Python package installed in the training pods (`TRAINING_MLFLOW_VERSION`), e.g. `3.18.0`.
+  # Leave empty to use the version pinned by kMLOps itself, which matches its own MLflow client.
+  # Keep it compatible with the MLflow server (`mlflow.image.tag` or the external server).
+  mlflowVersion: ""
+  # -- Version of the `minio` Python package installed in the training pods (`TRAINING_MINIO_VERSION`).
+  # Leave empty to use the version pinned by kMLOps itself.
+  minioVersion: ""
+  # -- Additional Python packages installed in the training pods (`TRAINING_PIP_EXTRA_PACKAGES`).
+  # Each entry must be exactly `name==version` (e.g. `scikit-learn==1.5.2`); any other format makes kMLOps fail at start-up.
+  extraPipPackages: []
+
+status:
+  # -- Interval in seconds at which kMLOps refreshes the status of active trainings from Kubernetes and MLflow.
+  pollIntervalSeconds: 10
+  # -- A training still `queued` or `launching_job` after this many seconds is marked as `failed`.
+  launchTimeoutSeconds: 300
+
+database:
+  # -- Training store used by kMLOps.
+  # `sqlite` keeps the database in a file under `/data` (see `persistence`); it allows a single replica.
+  # `postgres` uses a PostgreSQL server: the bundled one when `postgres.enabled` is `true`
+  # (in that case `postgres` is selected automatically), or the server configured in `externalPostgresql`.
+  backend: sqlite
+
+persistence:
+  # -- Store the SQLite database in a PersistentVolumeClaim mounted at `/data`. Only used when the backend is `sqlite`.
+  # If `false`, an `emptyDir` is used and all trainings are lost when the pod is restarted.
+  enabled: true
+  # -- Use an existing PersistentVolumeClaim instead of creating one.
+  existingClaim: ""
+  # -- StorageClass of the created PVC. Leave empty to use the cluster default StorageClass.
+  storageClass: ""
+  # -- Access modes of the created PVC.
+  accessModes:
+    - ReadWriteOnce
+  # -- Requested size of the created PVC.
+  size: 1Gi
+
+# -- MinIO bucket where kMLOps stores the uploaded datasets. kMLOps creates it at start-up if it does not exist.
+bucketName: kmlops
+
+externalMinio:
+  # -- Endpoint (`host:port`, without scheme) of an external MinIO or S3-compatible server.
+  # Required when `minio.enabled` is `false`; ignored otherwise.
+  endpoint: ""
+  # -- Use HTTPS to connect to the external MinIO server.
+  secure: true
+  # -- Access key of the external MinIO server. Stored in a Secret created by this chart.
+  # Ignored when `externalMinio.existingSecret` is set.
+  accessKey: ""
+  # -- Secret key of the external MinIO server. Stored in a Secret created by this chart.
+  # Ignored when `externalMinio.existingSecret` is set.
+  secretKey: ""
+  # -- Name of an existing Secret containing the external MinIO credentials. Takes precedence over `accessKey`/`secretKey`.
+  existingSecret: ""
+  # -- Key of `externalMinio.existingSecret` holding the access key.
+  existingSecretAccessKeyKey: access-key
+  # -- Key of `externalMinio.existingSecret` holding the secret key.
+  existingSecretSecretKeyKey: secret-key
+
+externalPostgresql:
+  # -- Hostname of an external PostgreSQL server. Required when `database.backend` is `postgres` and `postgres.enabled` is `false`.
+  host: ""
+  # -- Port of the external PostgreSQL server.
+  port: 5432
+  # -- Name of the database used by kMLOps. It must already exist; kMLOps creates its tables at start-up.
+  database: ""
+  # -- PostgreSQL user.
+  user: ""
+  # -- PostgreSQL password. Stored in a Secret created by this chart. Ignored when `externalPostgresql.existingSecret` is set.
+  password: ""
+  # -- Name of an existing Secret containing the PostgreSQL password. Takes precedence over `externalPostgresql.password`.
+  existingSecret: ""
+  # -- Key of `externalPostgresql.existingSecret` holding the password.
+  existingSecretPasswordKey: password
+
+externalMlflow:
+  # -- Tracking URI of an external MLflow server (e.g. `http://<host>:<port>`). Used only when `mlflow.enabled` is `false`.
+  # If empty and the bundled MLflow is disabled, kMLOps runs without MLflow and only tracks its own trainings.
+  # The server must accept artifact uploads from the training pods (proxied artifact storage, `--serve-artifacts`),
+  # because the training Jobs only receive the tracking URI.
+  trackingUri: ""
+
+# Bundled MLflow tracking server and model registry, rendered by this chart (`<release>-kmlops-mlflow`).
+# It stores its metadata in SQLite on a PersistentVolumeClaim and serves the run artifacts (`--serve-artifacts`)
+# from a bucket of the MinIO server used by kMLOps (bundled or external), so the training Jobs only need the tracking URI.
+mlflow:
+  # -- Deploy the bundled MLflow server. If `false`, set `externalMlflow.trackingUri` (or leave it empty to run without MLflow).
+  enabled: true
+  image:
+    # -- MLflow container image repository. The image must include `boto3` to store artifacts in MinIO/S3,
+    # which is why the official `-full` variant is used (the plain image does not include it).
+    repository: ghcr.io/mlflow/mlflow
+    # -- MLflow image tag.
+    tag: v3.18.0-full
+    # -- Image pull policy (`IfNotPresent`, `Always` or `Never`, see `image.pullPolicy`).
+    pullPolicy: IfNotPresent
+  # -- MinIO/S3 bucket where MLflow stores the run artifacts and models. An init container creates it if it does not exist.
+  artifactsBucket: mlflow
+  # -- Additional `Host` headers accepted by MLflow (`MLFLOW_SERVER_ALLOWED_HOSTS`), e.g. the hostname used to expose the UI.
+  # MLflow 3 rejects requests with any other host with HTTP 403. The in-cluster Service names and `localhost` are always allowed.
+  extraAllowedHosts: []
+  # -- Additional arguments appended to `mlflow server` (e.g. `["--workers", "2"]`).
+  extraArgs: []
+  # -- Additional environment variables of the MLflow container, as a list of Kubernetes `EnvVar` objects.
+  extraEnv: []
+  service:
+    # -- Service type of MLflow (`ClusterIP`, `NodePort` or `LoadBalancer`, see `service.type`).
+    # kMLOps and the training Jobs always use the in-cluster Service name.
+    type: ClusterIP
+    # -- Service port of MLflow. The container always listens on port 5000.
+    port: 5000
+  persistence:
+    # -- Store the MLflow SQLite database in a PersistentVolumeClaim mounted at `/mlflow`.
+    # If `false`, an `emptyDir` is used and all experiments, runs and registered models are lost when the pod restarts
+    # (the artifacts in MinIO are kept).
+    enabled: true
+    # -- Use an existing PersistentVolumeClaim instead of creating one.
+    existingClaim: ""
+    # -- StorageClass of the created PVC. Leave empty to use the cluster default StorageClass.
+    storageClass: ""
+    # -- Access modes of the created PVC.
+    accessModes:
+      - ReadWriteOnce
+    # -- Requested size of the created PVC.
+    size: 1Gi
+  # -- CPU and memory requests and limits of the MLflow container.
+  resources: {}
+  # -- Liveness probe of MLflow. The `Host: localhost` header is required because MLflow validates the `Host` header.
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: http
+      httpHeaders:
+        - name: Host
+          value: localhost
+    initialDelaySeconds: 30
+    periodSeconds: 20
+    failureThreshold: 3
+  # -- Readiness probe of MLflow.
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: http
+      httpHeaders:
+        - name: Host
+          value: localhost
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    failureThreshold: 3
+  # -- Pod-level security context of MLflow. Empty by default because the official image runs as root.
+  podSecurityContext: {}
+  # -- Container-level security context of MLflow.
+  securityContext: {}
+  # -- Annotations added to the MLflow pod.
+  podAnnotations: {}
+  # -- Node labels used to schedule the MLflow pod.
+  nodeSelector: {}
+  # -- Tolerations of the MLflow pod.
+  tolerations: []
+  # -- Affinity rules of the MLflow pod.
+  affinity: {}
+
+# MinIO subchart (cloudpirates/minio), named `<release>-minio`. Stores the kMLOps datasets and the MLflow artifacts.
+# Any value of the subchart can be set here (see the chart README for its documentation).
+minio:
+  # -- Deploy a MinIO server together with kMLOps. If `false`, configure `externalMinio`.
+  enabled: true
+  auth:
+    # -- MinIO root user, used by kMLOps and MLflow as access key.
+    rootUser: admin
+    # -- MinIO root password. Leave empty to generate a random one (kept across upgrades) in the `<release>-minio` Secret.
+    rootPassword: ""
+
+# PostgreSQL subchart (cloudpirates/postgres), named `<release>-postgres`. Optional training store for kMLOps.
+# Any value of the subchart can be set here (see the chart README for its documentation).
+postgres:
+  # -- Deploy a PostgreSQL server and use it as the kMLOps training store (overrides `database.backend`).
+  # Disabled by default: kMLOps uses SQLite.
+  enabled: false
+  auth:
+    # -- PostgreSQL user created at initialization and used by kMLOps. A database with the same name is created too.
+    username: kmlops
+    # -- Name of the database used by kMLOps.
+    database: kmlops
+    # -- Password of the user. Leave empty to generate a random one in the `<release>-postgres` Secret.
+    password: ""

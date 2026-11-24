@@ -1,0 +1,35 @@
+apiVersion: v2
+name: kmlops
+description: Lightweight Kubernetes-native MLOps service that trains Ludwig models as Kubernetes Jobs, stores datasets in MinIO and tracks experiments and models in MLflow.
+
+# A chart can be either an 'application' or a 'library' chart.
+type: application
+
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates, including the app version.
+# Versions are expected to follow Semantic Versioning (https://semver.org/)
+version: 0.0.1
+
+# This is the version number of the application being deployed.
+appVersion: "0.0.1"
+
+keywords:
+  - mlops
+  - machine-learning
+  - ludwig
+  - mlflow
+  - minio
+  - opentwins
+home: https://github.com/ertis-research/kmlops
+sources:
+  - https://github.com/ertis-research/kmlops
+
+dependencies:
+  - name: minio
+    version: ~0.14.0
+    repository: "oci://registry-1.docker.io/cloudpirates"
+    condition: minio.enabled
+  - name: postgres
+    version: ~0.22.1
+    repository: "oci://registry-1.docker.io/cloudpirates"
+    condition: postgres.enabled
