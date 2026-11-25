@@ -1,0 +1,194 @@
+# Default values for mlflow.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+#
+# MLflow always runs as a single replica: its SQLite backend store allows a single writer and lives on a
+# `ReadWriteOnce` volume, so the Deployment uses the `Recreate` strategy and the replica count is not configurable.
+
+image:
+  # -- MLflow container image repository. The image must include `boto3` when `artifacts.backend` is `s3`,
+  # which is why the official `-full` variant is used by default (the plain image does not include it).
+  repository: ghcr.io/mlflow/mlflow
+  # -- Image pull policy.
+  # `IfNotPresent` pulls the image only if it is not cached on the node, `Always` pulls it on every pod start,
+  # and `Never` only uses an image already present on the node.
+  pullPolicy: IfNotPresent
+  # -- Image tag. Leave empty to use `v<appVersion>-full` (the official full image of the chart `appVersion`).
+  tag: ""
+
+# -- References to Secrets of type `kubernetes.io/dockerconfigjson` used to pull the MLflow image from a private registry.
+# Example: `[{name: my-registry-credentials}]`. The Secrets must already exist in the release namespace.
+imagePullSecrets: []
+# -- Overrides the chart name used in resource names and the `app.kubernetes.io/name` label.
+nameOverride: ""
+# -- Fully overrides the name of the resources created by this chart (Deployment, Service, PVC, Secret...).
+# Changing it on an existing release creates a new PVC, so the previous metadata is no longer used.
+fullnameOverride: ""
+
+artifacts:
+  # -- Where MLflow stores the run artifacts and models. MLflow always serves them through its own API
+  # (`--serve-artifacts`), so clients only need the tracking URI.
+  # `local` stores them on the same volume as the SQLite database (`/mlflow/artifacts`) and needs no extra configuration.
+  # `s3` stores them in a bucket of an external S3-compatible object storage (e.g. a MinIO server) configured in `artifacts.s3`.
+  # Ignored when `minio.enabled` is `true`: the bundled MinIO is then always used as `s3` backend.
+  backend: local
+  # With `minio.enabled: true`, only `bucket` and `createBucket` are used; the endpoint and the credentials
+  # are taken from the bundled MinIO.
+  s3:
+    # -- URL of the external object storage, including the scheme (e.g. `http://<minio-service>:9000`), set as
+    # `MLFLOW_S3_ENDPOINT_URL`. Required when `artifacts.backend` is `s3` and `minio.enabled` is `false`.
+    # The value is rendered with `tpl`, so a parent chart can build it from the release context,
+    # e.g. `http://{{ .Release.Name }}-minio:9000`.
+    endpoint: ""
+    # -- Bucket where the artifacts are stored. Required when `artifacts.backend` is `s3`.
+    bucket: mlflow
+    # -- Create the bucket at start-up if it does not exist, with an init container that retries for up to five minutes
+    # while the object storage starts. Requires credentials allowed to create buckets. Set to `false` if the bucket
+    # is managed externally.
+    createBucket: true
+    # -- Name of an existing Secret with the S3 credentials (keys set in `accessKeyKey` and `secretKeyKey`).
+    # Rendered with `tpl`. If set, `accessKey` and `secretKey` are ignored and no Secret is created.
+    existingSecret: ""
+    # -- Key of the access key ID inside the credentials Secret.
+    accessKeyKey: access-key
+    # -- Key of the secret access key inside the credentials Secret.
+    secretKeyKey: secret-key
+    # -- Access key of the object storage. When set together with `secretKey` (and `existingSecret` is empty), the chart
+    # creates a Secret named `<fullname>-s3` with both values. Either `existingSecret` or both `accessKey` and `secretKey`
+    # are required when `artifacts.backend` is `s3` and `minio.enabled` is `false`.
+    accessKey: ""
+    # -- Secret key of the object storage. See `accessKey`. Prefer `existingSecret` so the credentials are not stored in the values.
+    secretKey: ""
+
+# -- Additional `Host` headers accepted by MLflow (`MLFLOW_SERVER_ALLOWED_HOSTS`), e.g. the hostname used to expose the UI
+# outside the chart. MLflow 3 rejects requests with any other host with HTTP 403. The in-cluster Service names,
+# `localhost`, the `ingress.hosts` and the `httpRoute.hostnames` are always allowed. Each entry is rendered with `tpl`.
+extraAllowedHosts: []
+
+# -- Additional arguments appended to `mlflow server` (e.g. `["--workers", "2"]`).
+# Do not set `--host`, `--port`, `--backend-store-uri` or the artifact options, which are managed by the chart.
+extraArgs: []
+
+# -- Additional environment variables of the MLflow container, as a list of Kubernetes `EnvVar` objects
+# (`name`/`value` or `valueFrom`), e.g. `MLFLOW_S3_IGNORE_TLS` for an object storage with a self-signed certificate.
+extraEnv: []
+
+# -- Annotations added to the MLflow pod.
+podAnnotations: {}
+# -- Labels added to the MLflow pod.
+podLabels: {}
+
+# -- Pod-level security context (e.g. `fsGroup`, `runAsUser`). Empty by default because the official image runs as root;
+# set `fsGroup` if you run it as a non-root user so it can write to the data volume.
+podSecurityContext: {}
+
+# -- Container-level security context (e.g. `capabilities`, `readOnlyRootFilesystem`, `runAsNonRoot`), applied to the
+# MLflow container and to the bucket initialization container. MLflow writes its database and artifacts under `/mlflow`.
+securityContext: {}
+
+service:
+  # -- Kubernetes Service type used to expose MLflow.
+  # `ClusterIP` exposes it only inside the cluster, `NodePort` also exposes it on every node using `service.nodePort`,
+  # and `LoadBalancer` requests an external load balancer from the cloud provider.
+  type: ClusterIP
+  # -- Service port. The tracking URI inside the cluster is `http://<fullname>:<port>`. The container always listens on port 5000.
+  port: 5000
+  # -- Node port used when `service.type` is `NodePort` or `LoadBalancer`. Leave empty to let Kubernetes assign one.
+  nodePort: ""
+
+ingress:
+  # -- Create an Ingress for the MLflow UI and API. Requires an ingress controller in the cluster and at least one entry in
+  # `ingress.hosts`. The hosts are added to the hosts accepted by MLflow automatically.
+  # MLflow has no authentication by default: anyone who can reach the Ingress can read and modify experiments and models.
+  enabled: false
+  # -- Ingress class name (e.g. `nginx`, `traefik`). Leave empty to use the cluster default class.
+  className: ""
+  # -- Annotations added to the Ingress (e.g. for the ingress controller or cert-manager).
+  annotations: {}
+  # -- Hosts and paths routed to MLflow. Each entry has `host` and a list of `paths` with `path` and `pathType`
+  # (`Prefix`, `Exact` or `ImplementationSpecific`). Example: `[{host: mlflow.example.org, paths: [{path: /, pathType: Prefix}]}]`.
+  hosts: []
+  # -- TLS configuration. Each entry has `secretName` (an existing TLS Secret) and the list of `hosts` it covers.
+  tls: []
+
+httpRoute:
+  # -- Create a Gateway API HTTPRoute for MLflow. Requires the Gateway API CRDs and an existing Gateway referenced in
+  # `httpRoute.parentRefs`. The hostnames are added to the hosts accepted by MLflow automatically.
+  enabled: false
+  # -- Annotations added to the HTTPRoute.
+  annotations: {}
+  # -- Gateways this route is attached to. Each entry has `name` and optionally `namespace` and `sectionName`.
+  parentRefs: []
+  # -- Hostnames matched by the route. Leave empty to match any hostname accepted by the Gateway
+  # (in that case add the public hostname to `extraAllowedHosts`).
+  hostnames: []
+  # -- Routing rules. Each rule has a list of `matches` and optional `filters`; all rules are sent to the MLflow Service.
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+
+persistence:
+  # -- Store the SQLite database (and the artifacts when `artifacts.backend` is `local`) in a PersistentVolumeClaim
+  # mounted at `/mlflow`. If `false`, an `emptyDir` is used and all experiments, runs, registered models and local
+  # artifacts are lost when the pod restarts.
+  enabled: true
+  # -- Use an existing PersistentVolumeClaim instead of creating one. Rendered with `tpl`.
+  existingClaim: ""
+  # -- StorageClass of the created PVC. Leave empty to use the cluster default StorageClass.
+  storageClass: ""
+  # -- Access modes of the created PVC. `ReadWriteOnce` is enough because MLflow runs a single replica.
+  accessModes:
+    - ReadWriteOnce
+  # -- Requested size of the created PVC. Increase it when `artifacts.backend` is `local`, since models are stored there.
+  size: 1Gi
+
+# -- CPU and memory requests and limits of the MLflow container (also applied to the bucket initialization container).
+# Example: `{requests: {cpu: 100m, memory: 512Mi}, limits: {memory: 2Gi}}`.
+resources: {}
+
+# -- Liveness probe of MLflow. The `Host: localhost` header is required because MLflow 3 validates the `Host` header
+# and would reject the pod IP used by the kubelet.
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+    httpHeaders:
+      - name: Host
+        value: localhost
+  initialDelaySeconds: 30
+  periodSeconds: 20
+  failureThreshold: 3
+# -- Readiness probe of MLflow. See `livenessProbe` for the `Host` header.
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+    httpHeaders:
+      - name: Host
+        value: localhost
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  failureThreshold: 3
+
+# MinIO subchart (cloudpirates/minio), named `<release>-minio`. Optional object storage for the MLflow artifacts.
+# Any value of the subchart can be set here (see the subchart README for its documentation).
+minio:
+  # -- Deploy a MinIO server together with MLflow and store the artifacts in it. When `true`, the `s3` artifact backend
+  # is used automatically with the bundled MinIO endpoint (`http://<release>-minio:9000`) and its credentials Secret,
+  # and the bucket `artifacts.s3.bucket` is created at start-up. Creates the MinIO StatefulSet, Services, Secret and PVC.
+  # Leave `false` to use the `local` backend or an external object storage configured in `artifacts.s3`.
+  enabled: false
+  auth:
+    # -- MinIO root user, used by MLflow as access key.
+    rootUser: admin
+    # -- MinIO root password. Leave empty to generate a random one (kept across upgrades) in the `<release>-minio` Secret.
+    rootPassword: ""
+
+# -- Node labels used to schedule the MLflow pod.
+nodeSelector: {}
+# -- Tolerations of the MLflow pod.
+tolerations: []
+# -- Affinity rules of the MLflow pod.
+affinity: {}

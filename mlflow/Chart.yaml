@@ -1,0 +1,31 @@
+apiVersion: v2
+name: mlflow
+description: MLflow tracking server and model registry with a SQLite backend store on a persistent volume and artifacts served from the volume or from an S3-compatible object storage.
+
+# A chart can be either an 'application' or a 'library' chart.
+type: application
+
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates, including the app version.
+# Versions are expected to follow Semantic Versioning (https://semver.org/)
+version: 0.0.1
+
+# This is the version number of the application being deployed (MLflow).
+appVersion: "3.18.0"
+
+keywords:
+  - mlflow
+  - mlops
+  - machine-learning
+  - model-registry
+  - experiment-tracking
+home: https://mlflow.org
+sources:
+  - https://github.com/mlflow/mlflow
+  - https://github.com/ertis-research/helm-charts
+
+dependencies:
+  - name: minio
+    version: ~0.14.0
+    repository: "oci://registry-1.docker.io/cloudpirates"
+    condition: minio.enabled

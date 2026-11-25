@@ -20,6 +20,7 @@ helm repo update
 | Name                  | Chart name              | Chart version | Application version |
 |-----------------------|-------------------------|---------------|---------------------|
 | OpenTwins MongoDB     | `OpenTwins-MongoDB`     | 0.1.0         | 4.4.6               |
+| MLflow                | `mlflow`                | 0.0.1         | 3.18.0              |
 | MqttToMongo           | `mqtttomongo`           | 1.0.1         | latest              |
 | Mosquitto             | `mosquitto`             | 0.3.1         | 1.6.10              |
 

@@ -1,0 +1,47 @@
+MLflow has been deployed in namespace {{ .Release.Namespace }}.
+
+1. Tracking URI for clients running inside the cluster:
+  http://{{ include "mlflow.fullname" . }}.{{ .Release.Namespace }}:{{ .Values.service.port }}
+
+2. Access the MLflow UI:
+{{- if .Values.httpRoute.enabled }}
+  MLflow is exposed through the HTTPRoute {{ include "mlflow.fullname" . }}.
+  {{- range .Values.httpRoute.hostnames }}
+  http://{{ . }}
+  {{- end }}
+{{- else if .Values.ingress.enabled }}
+{{- range $host := .Values.ingress.hosts }}
+  {{- range .paths }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
+  {{- end }}
+{{- end }}
+{{- else if contains "NodePort" .Values.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "mlflow.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
+  Add that address to extraAllowedHosts, or MLflow will answer HTTP 403.
+{{- else if contains "LoadBalancer" .Values.service.type }}
+  It may take a few minutes for the LoadBalancer address to be available. Watch it with:
+    kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "mlflow.fullname" . }}
+  Add the external address to extraAllowedHosts, or MLflow will answer HTTP 403.
+{{- else }}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "mlflow.fullname" . }} 5000:{{ .Values.service.port }}
+  Then open http://localhost:5000
+{{- end }}
+
+3. Configuration summary:
+  - Backend store: SQLite on {{ if .Values.persistence.enabled }}the PersistentVolumeClaim {{ include "mlflow.claimName" . }}{{ else }}an emptyDir (data is lost when the pod restarts){{ end }}
+{{- if eq (include "mlflow.artifactsBackend" .) "s3" }}
+  - Artifacts: bucket "{{ .Values.artifacts.s3.bucket }}" on {{ include "mlflow.s3.endpoint" . }}{{ if .Values.minio.enabled }} (bundled MinIO {{ include "mlflow.minio.fullname" . }}){{ end }}, served by MLflow
+{{- else }}
+  - Artifacts: /mlflow/artifacts on the same volume, served by MLflow
+{{- end }}
+{{- if and .Values.minio.enabled (not (dig "auth" "existingSecret" "" .Values.minio)) }}
+
+Retrieve the bundled MinIO root password with:
+  kubectl --namespace {{ .Release.Namespace }} get secret {{ include "mlflow.minio.fullname" . }} -o jsonpath="{.data.root-password}" | base64 -d
+{{- end }}
+{{- if or .Values.ingress.enabled .Values.httpRoute.enabled (ne .Values.service.type "ClusterIP") }}
+
+WARNING: MLflow has no authentication by default. Anyone who can reach it can read and modify experiments and models.
+{{- end }}

@@ -1,0 +1,157 @@
+{{- include "mlflow.validate" . }}
+{{- $s3 := eq (include "mlflow.artifactsBackend" .) "s3" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mlflow.fullname" . }}
+  labels:
+    {{- include "mlflow.labels" . | nindent 4 }}
+spec:
+  # A single replica: the SQLite backend store allows a single writer and its volume is ReadWriteOnce.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "mlflow.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- if or (include "mlflow.s3.createSecret" .) .Values.podAnnotations }}
+      annotations:
+        {{- if include "mlflow.s3.createSecret" . }}
+        # Restarts MLflow when the S3 credentials managed by this chart change.
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      labels:
+        {{- include "mlflow.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # MLflow does not call the Kubernetes API.
+      automountServiceAccountToken: false
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if and $s3 .Values.artifacts.s3.createBucket }}
+      initContainers:
+        # Creates the artifacts bucket if it does not exist, retrying while the object storage starts.
+        - name: create-bucket
+          image: {{ include "mlflow.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command:
+            - python
+            - -c
+            - |
+              import os, sys, time
+              import boto3
+              from botocore.exceptions import ClientError
+
+              bucket = os.environ["MLFLOW_ARTIFACTS_BUCKET"]
+              s3 = boto3.client("s3", endpoint_url=os.environ["MLFLOW_S3_ENDPOINT_URL"])
+              for attempt in range(60):
+                  try:
+                      try:
+                          s3.head_bucket(Bucket=bucket)
+                          print("Bucket " + bucket + " already exists")
+                      except ClientError as error:
+                          if error.response.get("Error", {}).get("Code") not in ("404", "NoSuchBucket"):
+                              raise
+                          s3.create_bucket(Bucket=bucket)
+                          print("Bucket " + bucket + " created")
+                      sys.exit(0)
+                  except Exception as error:
+                      print("Waiting for the object storage: " + str(error), flush=True)
+                      time.sleep(5)
+              sys.exit(1)
+          env:
+            {{- include "mlflow.s3.env" . | trim | nindent 12 }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- end }}
+      containers:
+        - name: mlflow
+          image: {{ include "mlflow.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command: ["mlflow"]
+          args:
+            - server
+            - --host=0.0.0.0
+            - --port=5000
+            - --backend-store-uri=sqlite:////mlflow/mlflow.db
+            - --serve-artifacts
+            {{- if $s3 }}
+            - --artifacts-destination=s3://{{ .Values.artifacts.s3.bucket }}/
+            {{- else }}
+            - --artifacts-destination=/mlflow/artifacts
+            {{- end }}
+            {{- with .Values.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 5000
+              protocol: TCP
+          env:
+            {{- if $s3 }}
+            {{- include "mlflow.s3.env" . | trim | nindent 12 }}
+            {{- end }}
+            - name: MLFLOW_SERVER_ALLOWED_HOSTS
+              value: {{ include "mlflow.allowedHosts" . | quote }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /mlflow
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "mlflow.claimName" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
