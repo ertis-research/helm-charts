@@ -2571,6 +2571,34 @@ entries:
     urls:
     - https://github.com/ertis-research/helm-charts/releases/download/kmlops-0.0.1/kmlops-0.0.1.tgz
     version: 0.0.1
+  mlflow:
+  - apiVersion: v2
+    appVersion: 3.18.0
+    created: "2026-11-25T19:14:48.09002737Z"
+    dependencies:
+    - condition: minio.enabled
+      name: minio
+      repository: oci://registry-1.docker.io/cloudpirates
+      version: ~0.14.0
+    description: MLflow tracking server and model registry with a SQLite backend store
+      on a persistent volume and artifacts served from the volume or from an S3-compatible
+      object storage.
+    digest: 02dfe22ef91d6f74bd8918eed1acb625a2eb43858990ea1a96b2060521c284ff
+    home: https://mlflow.org
+    keywords:
+    - mlflow
+    - mlops
+    - machine-learning
+    - model-registry
+    - experiment-tracking
+    name: mlflow
+    sources:
+    - https://github.com/mlflow/mlflow
+    - https://github.com/ertis-research/helm-charts
+    type: application
+    urls:
+    - https://github.com/ertis-research/helm-charts/releases/download/mlflow-0.0.1/mlflow-0.0.1.tgz
+    version: 0.0.1
   mosquitto:
   - apiVersion: v1
     appVersion: 1.6.10
@@ -2887,4 +2915,4 @@ entries:
     urls:
     - https://github.com/ertis-research/helm-charts/releases/download/opentwinsv2-0.0.1/opentwinsv2-0.0.1.tgz
     version: 0.0.1
-generated: "2026-11-24T15:49:05.981594024Z"
+generated: "2026-11-25T19:14:48.090141263Z"
