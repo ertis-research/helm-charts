@@ -2539,6 +2539,42 @@ entries:
     urls:
     - charts/OpenTwins-MongoDB-0.1.0.tgz
     version: 0.1.0
+  kmlops:
+  - apiVersion: v2
+    appVersion: 0.0.1
+    created: "2026-11-26T09:30:27.478206611Z"
+    dependencies:
+    - condition: minio.enabled
+      name: minio
+      repository: oci://registry-1.docker.io/cloudpirates
+      version: ~0.14.0
+    - condition: postgres.enabled
+      name: postgres
+      repository: oci://registry-1.docker.io/cloudpirates
+      version: ~0.22.1
+    - condition: mlflow.enabled
+      name: mlflow
+      repository: https://ertis-research.github.io/helm-charts/
+      version: 0.0.1
+    description: Lightweight Kubernetes-native MLOps service that trains Ludwig models
+      as Kubernetes Jobs, stores datasets in MinIO and tracks experiments and models
+      in MLflow.
+    digest: fcb3a1d2582ab760703e187d39913cce0e6569df73d733e6653a11e5db917343
+    home: https://github.com/ertis-research/kmlops
+    keywords:
+    - mlops
+    - machine-learning
+    - ludwig
+    - mlflow
+    - minio
+    - opentwins
+    name: kmlops
+    sources:
+    - https://github.com/ertis-research/kmlops
+    type: application
+    urls:
+    - https://github.com/ertis-research/helm-charts/releases/download/kmlops-0.0.1/kmlops-0.0.1.tgz
+    version: 0.0.1
   mlflow:
   - apiVersion: v2
     appVersion: 3.18.0
@@ -2883,4 +2919,4 @@ entries:
     urls:
     - https://github.com/ertis-research/helm-charts/releases/download/opentwinsv2-0.0.1/opentwinsv2-0.0.1.tgz
     version: 0.0.1
-generated: "2026-11-25T19:14:48.090141263Z"
+generated: "2026-11-26T09:30:27.651990904Z"
