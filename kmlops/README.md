@@ -14,14 +14,14 @@ All resource names are derived from the release name, so several releases can be
 - A `ServiceAccount`, plus a `Role` and `RoleBinding` that let kMLOps create, watch and delete the training `Job`s and read their pods and logs in the release namespace. Training Jobs always run in the release namespace.
 - The training store: a `PersistentVolumeClaim` for the SQLite database (default), or a connection to PostgreSQL.
 - A `Secret` with the credentials of external MinIO/PostgreSQL servers, only when they are provided as plain values.
-- An MLflow tracking server (`<release>-kmlops-mlflow`, enabled by default): a `Deployment`, a `Service` and a `PersistentVolumeClaim`. It runs the official [MLflow](https://github.com/mlflow/mlflow) image `ghcr.io/mlflow/mlflow:v3.18.0-full` (the plain image does not include `boto3`, which is required to store artifacts in MinIO/S3), stores its metadata in SQLite on the volume, and serves the artifacts (`--serve-artifacts`) from a bucket of the MinIO server used by kMLOps. An init container creates that bucket if it does not exist. The training Jobs therefore only need the MLflow tracking URI.
+- An MLflow tracking server (`<release>-mlflow`, enabled by default), deployed with the [ertis/mlflow](https://github.com/ertis-research/helm-charts/tree/main/mlflow) chart as a dependency: a `Deployment`, a `Service` and a `PersistentVolumeClaim` running the official [MLflow](https://github.com/mlflow/mlflow) image (`ghcr.io/mlflow/mlflow:v3.18.0-full`). It stores its metadata in SQLite on the volume and serves the artifacts (`--serve-artifacts`) from the `mlflow` bucket of the bundled MinIO, which it creates if it does not exist. The training Jobs therefore only need the MLflow tracking URI.
 - Optional dependencies, each of which can be replaced by an external server:
 
 | Component | Source | Default | Purpose | External alternative |
 |-----------|--------|---------|---------|----------------------|
 | MinIO | [cloudpirates/minio](https://artifacthub.io/packages/helm/cloudpirates-minio/minio) `~0.14.0` (`<release>-minio`) | enabled (`minio.enabled`) | Datasets and MLflow artifacts | `externalMinio.*` |
 | PostgreSQL | [cloudpirates/postgres](https://artifacthub.io/packages/helm/cloudpirates-postgres/postgres) `~0.22.1` (`<release>-postgres`) | disabled (`postgres.enabled`) | kMLOps training store | `database.backend=postgres` + `externalPostgresql.*` |
-| MLflow | Templates of this chart (`<release>-kmlops-mlflow`) | enabled (`mlflow.enabled`) | Tracking server and model registry | `externalMlflow.trackingUri` |
+| MLflow | [ertis/mlflow](https://github.com/ertis-research/helm-charts/tree/main/mlflow) `0.0.1` (`<release>-mlflow`) | enabled (`mlflow.enabled`) | Tracking server and model registry | `externalMlflow.trackingUri` |
 
 ## Prerequisites
 
@@ -38,16 +38,16 @@ helm repo add ertis https://ertis-research.github.io/helm-charts/
 helm repo update
 ```
 
-Install the chart with the bundled MinIO and MLflow and the SQLite training store (replace `<release>` and `<namespace>`):
+Install the chart with the bundled MinIO and MLflow and the SQLite training store (replace `<namespace>`). The examples use `kmlops` as release name, so the main resources are named `kmlops`, `kmlops-minio` and `kmlops-mlflow`; choose another name to install several releases in the same namespace:
 
 ```bash
-helm upgrade --install <release> ertis/kmlops -n <namespace> --create-namespace
+helm upgrade --install kmlops ertis/kmlops -n <namespace> --create-namespace
 ```
 
 Use the bundled PostgreSQL as training store instead of SQLite:
 
 ```bash
-helm upgrade --install <release> ertis/kmlops -n <namespace> --create-namespace \
+helm upgrade --install kmlops ertis/kmlops -n <namespace> --create-namespace \
   --set postgres.enabled=true
 ```
 
@@ -74,32 +74,51 @@ externalPostgresql:
 ```
 
 ```bash
-helm upgrade --install <release> ertis/kmlops -n <namespace> --create-namespace -f my-values.yaml
+helm upgrade --install kmlops ertis/kmlops -n <namespace> --create-namespace -f my-values.yaml
 ```
 
 Notes:
 
-- The bundled MLflow can also be combined with an external MinIO/S3 server: keep `mlflow.enabled=true` and configure `externalMinio`. MLflow uses the same endpoint and credentials and creates its `mlflow.artifactsBucket` bucket there.
+- The bundled MLflow can also be combined with an external MinIO/S3 server: keep `mlflow.enabled=true`, configure `externalMinio` and point MLflow to the same server. The MLflow subchart cannot read the kMLOps values, so its object storage is configured separately in `mlflow.artifacts.s3`. By default it points to the bundled MinIO, and rendering fails if `minio.enabled` is `false` and those defaults are kept. MLflow creates its `mlflow.artifacts.s3.bucket` bucket there:
+
+  ```yaml
+  minio:
+    enabled: false
+  externalMinio:
+    endpoint: "<minio-host>:<port>"
+    secure: true
+    existingSecret: "<secret-with-minio-credentials>"   # keys: access-key, secret-key
+  mlflow:
+    artifacts:
+      s3:
+        endpoint: "https://<minio-host>:<port>"         # URL with scheme
+        existingSecret: "<secret-with-minio-credentials>"
+        accessKeyKey: access-key
+        secretKeyKey: secret-key
+  ```
+
+  Alternatively, set `mlflow.artifacts.backend=local` to keep the MLflow artifacts on the MLflow volume.
 - An external MLflow server must serve artifacts itself (`--serve-artifacts`), because the training Jobs only receive the tracking URI.
 - MLflow 3 rejects requests whose `Host` header is not allowed (HTTP 403). The in-cluster Service names and `localhost` are allowed by default; if you expose the MLflow UI through your own Ingress or hostname, add it to `mlflow.extraAllowedHosts`.
+- All the options of the bundled MLflow (persistence, resources, Ingress, extra allowed hosts...) are documented in the [ertis/mlflow README](https://github.com/ertis-research/helm-charts/tree/main/mlflow) and can be set under the `mlflow` key.
 
 After the installation, follow the instructions printed by Helm to reach the API. Its interactive documentation is available at `/docs`.
 
 ## Uninstallation
 
 ```bash
-helm uninstall <release> -n <namespace>
+helm uninstall kmlops -n <namespace>
 ```
 
-This deletes the resources created by the chart, including the persistent volume claims of the SQLite training store, the MLflow metadata and the MinIO data, so that data is lost. The volume claim of the bundled PostgreSQL is created by its StatefulSet and is **not** deleted; remove it manually if you no longer need it:
+This deletes the resources created by the chart and its dependencies, including the persistent volume claims of the SQLite training store, the MLflow metadata and the MinIO data, so that data is lost. A claim given in `mlflow.persistence.existingClaim` is not deleted. The volume claim of the bundled PostgreSQL is created by its StatefulSet and is **not** deleted; remove it manually if you no longer need it:
 
 ```bash
-kubectl delete pvc -n <namespace> -l app.kubernetes.io/instance=<release>,app.kubernetes.io/name=postgres
+kubectl delete pvc -n <namespace> -l app.kubernetes.io/instance=kmlops,app.kubernetes.io/name=postgres
 ```
 
 ## Values
 
-The documentation of every value of the dependencies can be found in their charts: [MinIO](https://artifacthub.io/packages/helm/cloudpirates-minio/minio) and [PostgreSQL](https://artifacthub.io/packages/helm/cloudpirates-postgres/postgres). Any of them can be set under the `minio` and `postgres` keys.
+The documentation of every value of the dependencies can be found in their charts: [MinIO](https://artifacthub.io/packages/helm/cloudpirates-minio/minio), [PostgreSQL](https://artifacthub.io/packages/helm/cloudpirates-postgres/postgres) and [MLflow](https://github.com/ertis-research/helm-charts/tree/main/mlflow). Any of them can be set under the `minio`, `postgres` and `mlflow` keys. The table lists the values set by this chart.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
@@ -144,7 +163,7 @@ The documentation of every value of the dependencies can be found in their chart
 | `training.image` | string | `"ludwigai/ludwig:0.17"` | Container image used by the training Jobs. It must contain Ludwig; the Job installs pinned versions of `minio` and `mlflow` (plus `training.extraPipPackages`) with pip at start-up, so the training pods need access to a Python package index. |
 | `training.jobTtlSeconds` | int | `60` | Seconds after which Kubernetes deletes finished training Jobs and their pods. `0` deletes them immediately. |
 | `training.backoffLimit` | int | `1` | Number of retries of a failed training pod before the Job is marked as failed. |
-| `training.mlflowVersion` | string | `""` | Version of the `mlflow` Python package installed in the training pods (`TRAINING_MLFLOW_VERSION`), e.g. `3.18.0`. Leave empty to use the version pinned by kMLOps itself, which matches its own MLflow client. Keep it compatible with the MLflow server (`mlflow.image.tag` or the external server). |
+| `training.mlflowVersion` | string | `""` | Version of the `mlflow` Python package installed in the training pods (`TRAINING_MLFLOW_VERSION`), e.g. `3.18.0`. Leave empty to use the version pinned by kMLOps itself, which matches its own MLflow client. Keep it compatible with the MLflow server (the bundled one runs the `appVersion` of the ertis/mlflow chart unless `mlflow.image.tag` is set, or the external server). |
 | `training.minioVersion` | string | `""` | Version of the `minio` Python package installed in the training pods (`TRAINING_MINIO_VERSION`). Leave empty to use the version pinned by kMLOps itself. |
 | `training.extraPipPackages` | list | `[]` | Additional Python packages installed in the training pods (`TRAINING_PIP_EXTRA_PACKAGES`). Each entry must be exactly `name==version` (e.g. `scikit-learn==1.5.2`); any other format makes kMLOps fail at start-up. |
 | `status.pollIntervalSeconds` | int | `10` | Interval in seconds at which kMLOps refreshes the status of active trainings from Kubernetes and MLflow. |
@@ -171,30 +190,13 @@ The documentation of every value of the dependencies can be found in their chart
 | `externalPostgresql.existingSecret` | string | `""` | Name of an existing Secret containing the PostgreSQL password. Takes precedence over `externalPostgresql.password`. |
 | `externalPostgresql.existingSecretPasswordKey` | string | `"password"` | Key of `externalPostgresql.existingSecret` holding the password. |
 | `externalMlflow.trackingUri` | string | `""` | Tracking URI of an external MLflow server (e.g. `http://<host>:<port>`). Used only when `mlflow.enabled` is `false`. If empty and the bundled MLflow is disabled, kMLOps runs without MLflow and only tracks its own trainings. The server must accept artifact uploads from the training pods (proxied artifact storage, `--serve-artifacts`), because the training Jobs only receive the tracking URI. |
-| `mlflow.enabled` | bool | `true` | Deploy the bundled MLflow server. If `false`, set `externalMlflow.trackingUri` (or leave it empty to run without MLflow). |
-| `mlflow.image.repository` | string | `"ghcr.io/mlflow/mlflow"` | MLflow container image repository. The image must include `boto3` to store artifacts in MinIO/S3, which is why the official `-full` variant is used (the plain image does not include it). |
-| `mlflow.image.tag` | string | `"v3.18.0-full"` | MLflow image tag. |
-| `mlflow.image.pullPolicy` | string | `"IfNotPresent"` | Image pull policy (`IfNotPresent`, `Always` or `Never`, see `image.pullPolicy`). |
-| `mlflow.artifactsBucket` | string | `"mlflow"` | MinIO/S3 bucket where MLflow stores the run artifacts and models. An init container creates it if it does not exist. |
-| `mlflow.extraAllowedHosts` | list | `[]` | Additional `Host` headers accepted by MLflow (`MLFLOW_SERVER_ALLOWED_HOSTS`), e.g. the hostname used to expose the UI. MLflow 3 rejects requests with any other host with HTTP 403. The in-cluster Service names and `localhost` are always allowed. |
-| `mlflow.extraArgs` | list | `[]` | Additional arguments appended to `mlflow server` (e.g. `["--workers", "2"]`). |
-| `mlflow.extraEnv` | list | `[]` | Additional environment variables of the MLflow container, as a list of Kubernetes `EnvVar` objects. |
-| `mlflow.service.type` | string | `"ClusterIP"` | Service type of MLflow (`ClusterIP`, `NodePort` or `LoadBalancer`, see `service.type`). kMLOps and the training Jobs always use the in-cluster Service name. |
-| `mlflow.service.port` | int | `5000` | Service port of MLflow. The container always listens on port 5000. |
-| `mlflow.persistence.enabled` | bool | `true` | Store the MLflow SQLite database in a PersistentVolumeClaim mounted at `/mlflow`. If `false`, an `emptyDir` is used and all experiments, runs and registered models are lost when the pod restarts (the artifacts in MinIO are kept). |
-| `mlflow.persistence.existingClaim` | string | `""` | Use an existing PersistentVolumeClaim instead of creating one. |
-| `mlflow.persistence.storageClass` | string | `""` | StorageClass of the created PVC. Leave empty to use the cluster default StorageClass. |
-| `mlflow.persistence.accessModes` | list | `["ReadWriteOnce"]` | Access modes of the created PVC. |
-| `mlflow.persistence.size` | string | `"1Gi"` | Requested size of the created PVC. |
-| `mlflow.resources` | object | `{}` | CPU and memory requests and limits of the MLflow container. |
-| `mlflow.livenessProbe` | object | `{"httpGet":{"path":"/health","port":"http","httpHeaders":[{"name":"Host","value":"localhost"}]},"initialDelaySeconds":30,"periodSeconds":20,"failureThreshold":3}` | Liveness probe of MLflow. The `Host: localhost` header is required because MLflow validates the `Host` header. |
-| `mlflow.readinessProbe` | object | `{"httpGet":{"path":"/health","port":"http","httpHeaders":[{"name":"Host","value":"localhost"}]},"initialDelaySeconds":10,"periodSeconds":10,"failureThreshold":3}` | Readiness probe of MLflow. |
-| `mlflow.podSecurityContext` | object | `{}` | Pod-level security context of MLflow. Empty by default because the official image runs as root. |
-| `mlflow.securityContext` | object | `{}` | Container-level security context of MLflow. |
-| `mlflow.podAnnotations` | object | `{}` | Annotations added to the MLflow pod. |
-| `mlflow.nodeSelector` | object | `{}` | Node labels used to schedule the MLflow pod. |
-| `mlflow.tolerations` | list | `[]` | Tolerations of the MLflow pod. |
-| `mlflow.affinity` | object | `{}` | Affinity rules of the MLflow pod. |
+| `mlflow.enabled` | bool | `true` | Deploy the bundled MLflow server (`<release>-mlflow`, ertis/mlflow chart). kMLOps and the training Jobs use its in-cluster Service as tracking URI. If `false`, set `externalMlflow.trackingUri` (or leave it empty to run without MLflow). |
+| `mlflow.artifacts.backend` | string | `"s3"` | Where MLflow stores the run artifacts and models. `s3` uses the object storage configured in `mlflow.artifacts.s3` (by default the bundled MinIO); `local` stores them on the MLflow volume (increase `mlflow.persistence.size` accordingly). |
+| `mlflow.artifacts.s3.endpoint` | string | `"http://{{ .Release.Name }}-minio:9000"` | URL (with scheme) of the object storage used by MLflow, rendered with `tpl`. The default is the bundled MinIO; set it when `minio.enabled` is `false`. |
+| `mlflow.artifacts.s3.bucket` | string | `"mlflow"` | Bucket where MLflow stores the artifacts. MLflow creates it at start-up if it does not exist. Keep it different from `bucketName`. |
+| `mlflow.artifacts.s3.existingSecret` | string | `"{{ .Release.Name }}-minio"` | Existing Secret with the object storage credentials, rendered with `tpl`. The default is the Secret of the bundled MinIO. |
+| `mlflow.artifacts.s3.accessKeyKey` | string | `"root-user"` | Key of the access key inside `mlflow.artifacts.s3.existingSecret`. |
+| `mlflow.artifacts.s3.secretKeyKey` | string | `"root-password"` | Key of the secret key inside `mlflow.artifacts.s3.existingSecret`. |
 | `minio.enabled` | bool | `true` | Deploy a MinIO server together with kMLOps. If `false`, configure `externalMinio`. |
 | `minio.auth.rootUser` | string | `"admin"` | MinIO root user, used by kMLOps and MLflow as access key. |
 | `minio.auth.rootPassword` | string | `""` | MinIO root password. Leave empty to generate a random one (kept across upgrades) in the `<release>-minio` Secret. |

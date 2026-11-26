@@ -11,7 +11,7 @@ The chart is designed to be used on its own or as an optional dependency of othe
 
 ## What the chart creates
 
-All resource names are derived from the release name (`<release>-mlflow`, or just `<release>` when the release name already contains `mlflow`, e.g. `mlflow` or `mlflow-dev`), so several releases can be installed in the same namespace. The examples below use `<release>-mlflow`.
+All resource names are derived from the release name (`<release>-mlflow`, or just `<release>` when the release name already contains `mlflow`, e.g. `mlflow` or `mlflow-dev`), so several releases can be installed in the same namespace. The resource names below use the `<release>-mlflow` form.
 
 - A `Deployment` with a single MLflow replica (official image `ghcr.io/mlflow/mlflow:v3.18.0-full`, port `5000`) using the `Recreate` strategy, since SQLite allows a single writer.
 - A `Service` exposing it. The tracking URI inside the cluster is `http://<release>-mlflow.<namespace>:5000`.
@@ -42,16 +42,16 @@ helm repo add ertis https://ertis-research.github.io/helm-charts/
 helm repo update
 ```
 
-Install MLflow with SQLite and local artifacts on the persistent volume (replace `<release>` and `<namespace>`):
+Install MLflow with SQLite and local artifacts on the persistent volume (replace `<namespace>`). The examples use `mlflow` as release name, so the resources are named `mlflow` and `mlflow-data`; choose another name to install several releases in the same namespace:
 
 ```bash
-helm upgrade --install <release> ertis/mlflow -n <namespace> --create-namespace
+helm upgrade --install mlflow ertis/mlflow -n <namespace> --create-namespace
 ```
 
 Store the artifacts in a MinIO server deployed by the same release:
 
 ```bash
-helm upgrade --install <release> ertis/mlflow -n <namespace> --create-namespace --set minio.enabled=true
+helm upgrade --install mlflow ertis/mlflow -n <namespace> --create-namespace --set minio.enabled=true
 ```
 
 Store the artifacts in an existing S3-compatible object storage, with the credentials in an existing Secret:
@@ -66,13 +66,13 @@ artifacts:
 ```
 
 ```bash
-helm upgrade --install <release> ertis/mlflow -n <namespace> --create-namespace -f my-values.yaml --rollback-on-failure
+helm upgrade --install mlflow ertis/mlflow -n <namespace> --create-namespace -f my-values.yaml --rollback-on-failure
 ```
 
 Access the UI from your machine:
 
 ```bash
-kubectl -n <namespace> port-forward svc/<release>-mlflow 5000:5000
+kubectl -n <namespace> port-forward svc/mlflow 5000:5000
 ```
 
 Then open `http://localhost:5000`.
@@ -124,7 +124,7 @@ mlflow:
 ## Uninstallation
 
 ```bash
-helm uninstall <release> -n <namespace>
+helm uninstall mlflow -n <namespace>
 ```
 
 This deletes the resources created by the chart, including the `PersistentVolumeClaim`s created by the chart and by the bundled MinIO. The MLflow metadata and the artifacts stored on the volume or in the bundled MinIO are therefore lost. Objects stored in an external S3 bucket and a PVC given in `persistence.existingClaim` are not deleted.

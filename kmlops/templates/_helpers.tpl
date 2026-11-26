@@ -121,34 +121,22 @@ Usage: {{ include "kmlops.subchartFullname" (dict "name" "minio" "values" .Value
 {{- end }}
 
 {{/*
-Name of the bundled MLflow resources.
+Name of the bundled MLflow resources (ertis/mlflow subchart, same naming rule as the other subcharts).
 */}}
 {{- define "kmlops.mlflow.fullname" -}}
-{{- printf "%s-mlflow" (include "kmlops.fullname" . | trunc 56 | trimSuffix "-") -}}
+{{- include "kmlops.subchartFullname" (dict "name" "mlflow" "values" .Values.mlflow "context" .) -}}
 {{- end }}
 
 {{/*
-Labels of the bundled MLflow resources. They use their own app.kubernetes.io/name so that the
-kMLOps API selectors never match the MLflow pods.
+Default S3 settings of the bundled MLflow in values.yaml. They point to the bundled MinIO and are used
+to detect configurations where they no longer match it (see kmlops.validate).
 */}}
-{{- define "kmlops.mlflow.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "kmlops.name" . }}-mlflow
-app.kubernetes.io/instance: {{ .Release.Name }}
+{{- define "kmlops.mlflow.defaultS3Endpoint" -}}
+http://{{ "{{" }} .Release.Name {{ "}}" }}-minio:9000
 {{- end }}
 
-{{- define "kmlops.mlflow.labels" -}}
-helm.sh/chart: {{ include "kmlops.chart" . }}
-{{ include "kmlops.mlflow.selectorLabels" . }}
-app.kubernetes.io/component: mlflow
-app.kubernetes.io/part-of: {{ include "kmlops.name" . }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- end }}
-
-{{/*
-Name of the PVC holding the MLflow SQLite database.
-*/}}
-{{- define "kmlops.mlflow.claimName" -}}
-{{- .Values.mlflow.persistence.existingClaim | default (printf "%s-data" (include "kmlops.mlflow.fullname" .)) }}
+{{- define "kmlops.mlflow.defaultS3Secret" -}}
+{{ "{{" }} .Release.Name {{ "}}" }}-minio
 {{- end }}
 
 {{/*
@@ -287,7 +275,7 @@ MLflow tracking URI (empty when MLflow is not used).
 */}}
 {{- define "kmlops.mlflow.trackingUri" -}}
 {{- if .Values.mlflow.enabled -}}
-{{- printf "http://%s:%v" (include "kmlops.mlflow.fullname" .) .Values.mlflow.service.port -}}
+{{- printf "http://%s:%v" (include "kmlops.mlflow.fullname" .) (dig "service" "port" 5000 .Values.mlflow) -}}
 {{- else -}}
 {{- .Values.externalMlflow.trackingUri -}}
 {{- end -}}
@@ -314,25 +302,43 @@ Validate the configuration.
 {{- if and (eq $backend "postgres") (not .Values.postgres.enabled) (not .Values.externalPostgresql.existingSecret) (not .Values.externalPostgresql.password) -}}
 {{- fail "externalPostgresql.password (or externalPostgresql.existingSecret) is required when database.backend is postgres and postgres.enabled is false" -}}
 {{- end -}}
+{{- if .Values.mlflow.enabled -}}
+{{- include "kmlops.validateMlflow" . -}}
+{{- end -}}
 {{- end }}
 
 {{/*
-S3 environment variables shared by the MLflow server and its bucket initialization container.
-Usage: {{ include "kmlops.mlflow.s3Env" (dict "endpoint" $s3Endpoint "context" .) }}
+Validate the bundled MLflow (ertis/mlflow subchart). The subchart cannot read the kMLOps values, so its
+artifact storage is configured in mlflow.artifacts.s3; by default it points to the bundled MinIO. These
+checks catch configurations where those defaults no longer match the MinIO actually used by kMLOps.
 */}}
-{{- define "kmlops.mlflow.s3Env" -}}
-- name: MLFLOW_S3_ENDPOINT_URL
-  value: {{ .endpoint | quote }}
-- name: MLFLOW_ARTIFACTS_BUCKET
-  value: {{ required "mlflow.artifactsBucket is required" .context.Values.mlflow.artifactsBucket | quote }}
-- name: AWS_ACCESS_KEY_ID
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "kmlops.minio.secretName" .context }}
-      key: {{ include "kmlops.minio.accessKeyKey" .context }}
-- name: AWS_SECRET_ACCESS_KEY
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "kmlops.minio.secretName" .context }}
-      key: {{ include "kmlops.minio.secretKeyKey" .context }}
+{{- define "kmlops.validateMlflow" -}}
+{{- $mlflowName := include "kmlops.mlflow.fullname" . -}}
+{{- $names := list (include "kmlops.fullname" .) -}}
+{{- if .Values.minio.enabled }}{{ $names = append $names (include "kmlops.minio.fullname" .) }}{{ end -}}
+{{- if .Values.postgres.enabled }}{{ $names = append $names (include "kmlops.postgres.fullname" .) }}{{ end -}}
+{{- if has $mlflowName $names -}}
+{{- fail (printf "The release name '%s' makes the bundled MLflow resources collide with other resources of the release; use another release name or set mlflow.nameOverride" .Release.Name) -}}
+{{- end -}}
+{{- $backend := dig "artifacts" "backend" "local" .Values.mlflow -}}
+{{- $s3 := dig "artifacts" "s3" dict .Values.mlflow -}}
+{{- if and (eq $backend "s3") (not (dig "minio" "enabled" false .Values.mlflow)) -}}
+{{- $endpoint := $s3.endpoint | default "" -}}
+{{- $secret := $s3.existingSecret | default "" -}}
+{{- $defaultEndpoint := eq $endpoint (include "kmlops.mlflow.defaultS3Endpoint" .) -}}
+{{- $defaultSecret := eq $secret (include "kmlops.mlflow.defaultS3Secret" .) -}}
+{{- if not .Values.minio.enabled -}}
+{{- if or $defaultEndpoint $defaultSecret -}}
+{{- fail "minio.enabled is false, but mlflow.artifacts.s3 still points to the bundled MinIO. Set mlflow.artifacts.s3.endpoint (URL with scheme) and mlflow.artifacts.s3.existingSecret with accessKeyKey/secretKeyKey (or accessKey/secretKey) for the external object storage, or set mlflow.artifacts.backend=local" -}}
+{{- end -}}
+{{- else -}}
+{{- $expectedEndpoint := printf "http://%s" (include "kmlops.minio.endpoint" .) -}}
+{{- if and $defaultEndpoint (ne (tpl $endpoint .) $expectedEndpoint) -}}
+{{- fail (printf "The default mlflow.artifacts.s3.endpoint does not match the bundled MinIO endpoint '%s' (release name, minio.nameOverride or minio.service.port changed); set mlflow.artifacts.s3.endpoint explicitly" $expectedEndpoint) -}}
+{{- end -}}
+{{- if and $defaultSecret (or (ne (tpl $secret .) (include "kmlops.minio.secretName" .)) (ne ($s3.accessKeyKey | default "") (include "kmlops.minio.accessKeyKey" .)) (ne ($s3.secretKeyKey | default "") (include "kmlops.minio.secretKeyKey" .))) -}}
+{{- fail (printf "The default mlflow.artifacts.s3 credentials do not match the bundled MinIO Secret '%s' (keys '%s'/'%s'); set mlflow.artifacts.s3.existingSecret, accessKeyKey and secretKeyKey explicitly" (include "kmlops.minio.secretName" .) (include "kmlops.minio.accessKeyKey" .) (include "kmlops.minio.secretKeyKey" .)) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
 {{- end }}

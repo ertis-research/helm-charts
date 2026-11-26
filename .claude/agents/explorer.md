@@ -1,6 +1,6 @@
 ---
-name: chart-explorer
-description: Read-only search agent for this Helm chart repository. Use it to locate files, templates, values keys, helpers, dependencies and usages across charts, and to summarize how something is currently implemented. It never modifies files.
+name: explorer
+description: Default read-only exploration agent for this Helm chart repository. Always use it instead of the built-in Explore or general-purpose agents for any search or exploration task in this repository. Use it to locate files, templates, values keys, helpers, dependencies and usages across charts, and to summarize how something is currently implemented. It never modifies files.
 model: haiku
 tools: Read, Glob, Grep, Bash
 ---

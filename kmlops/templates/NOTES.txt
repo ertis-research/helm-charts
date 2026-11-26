@@ -29,12 +29,12 @@ kMLOps has been deployed in namespace {{ .Release.Namespace }}.
 2. Configuration summary:
   - Training store: {{ include "kmlops.databaseBackend" . }}{{ if .Values.postgres.enabled }} (bundled PostgreSQL {{ include "kmlops.postgres.fullname" . }}){{ end }}
   - MinIO: {{ include "kmlops.minio.endpoint" . }}{{ if .Values.minio.enabled }} (bundled){{ else }} (external){{ end }}, dataset bucket "{{ .Values.bucketName }}"
-  - MLflow: {{ include "kmlops.mlflow.trackingUri" . | default "disabled (only local trainings are tracked)" }}{{ if .Values.mlflow.enabled }} (bundled, artifacts in bucket "{{ .Values.mlflow.artifactsBucket }}"){{ end }}
+  - MLflow: {{ include "kmlops.mlflow.trackingUri" . | default "disabled (only local trainings are tracked)" }}{{ if .Values.mlflow.enabled }} (bundled ertis/mlflow, artifacts {{ if eq (dig "artifacts" "backend" "local" .Values.mlflow) "s3" }}in bucket "{{ dig "artifacts" "s3" "bucket" "" .Values.mlflow }}"{{ else }}on the MLflow volume{{ end }}){{ end }}
   - Training Jobs run in namespace {{ .Release.Namespace }} with image {{ .Values.training.image }}
 {{- if .Values.mlflow.enabled }}
 
 3. Access the bundled MLflow UI:
-  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "kmlops.mlflow.fullname" . }} 5000:{{ .Values.mlflow.service.port }}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "kmlops.mlflow.fullname" . }} 5000:{{ dig "service" "port" 5000 .Values.mlflow }}
   Then open http://localhost:5000
 {{- end }}
 {{- if .Values.minio.enabled }}

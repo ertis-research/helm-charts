@@ -141,7 +141,8 @@ training:
   backoffLimit: 1
   # -- Version of the `mlflow` Python package installed in the training pods (`TRAINING_MLFLOW_VERSION`), e.g. `3.18.0`.
   # Leave empty to use the version pinned by kMLOps itself, which matches its own MLflow client.
-  # Keep it compatible with the MLflow server (`mlflow.image.tag` or the external server).
+  # Keep it compatible with the MLflow server (the bundled one runs the `appVersion` of the ertis/mlflow chart unless
+  # `mlflow.image.tag` is set, or the external server).
   mlflowVersion: ""
   # -- Version of the `minio` Python package installed in the training pods (`TRAINING_MINIO_VERSION`).
   # Leave empty to use the version pinned by kMLOps itself.
@@ -222,85 +223,37 @@ externalMlflow:
   # because the training Jobs only receive the tracking URI.
   trackingUri: ""
 
-# Bundled MLflow tracking server and model registry, rendered by this chart (`<release>-kmlops-mlflow`).
+# Bundled MLflow tracking server and model registry, deployed with the ertis/mlflow subchart and named `<release>-mlflow`.
 # It stores its metadata in SQLite on a PersistentVolumeClaim and serves the run artifacts (`--serve-artifacts`)
-# from a bucket of the MinIO server used by kMLOps (bundled or external), so the training Jobs only need the tracking URI.
+# from a bucket of the bundled MinIO, so the training Jobs only need the tracking URI.
+# Any value of the subchart can be set here (see the ertis/mlflow chart README for its documentation), e.g.
+# `persistence.*`, `resources`, `extraAllowedHosts`, `ingress.*` or `image.*`.
 mlflow:
-  # -- Deploy the bundled MLflow server. If `false`, set `externalMlflow.trackingUri` (or leave it empty to run without MLflow).
+  # -- Deploy the bundled MLflow server (`<release>-mlflow`). kMLOps and the training Jobs use its in-cluster Service as
+  # tracking URI. If `false`, set `externalMlflow.trackingUri` (or leave it empty to run without MLflow).
   enabled: true
-  image:
-    # -- MLflow container image repository. The image must include `boto3` to store artifacts in MinIO/S3,
-    # which is why the official `-full` variant is used (the plain image does not include it).
-    repository: ghcr.io/mlflow/mlflow
-    # -- MLflow image tag.
-    tag: v3.18.0-full
-    # -- Image pull policy (`IfNotPresent`, `Always` or `Never`, see `image.pullPolicy`).
-    pullPolicy: IfNotPresent
-  # -- MinIO/S3 bucket where MLflow stores the run artifacts and models. An init container creates it if it does not exist.
-  artifactsBucket: mlflow
-  # -- Additional `Host` headers accepted by MLflow (`MLFLOW_SERVER_ALLOWED_HOSTS`), e.g. the hostname used to expose the UI.
-  # MLflow 3 rejects requests with any other host with HTTP 403. The in-cluster Service names and `localhost` are always allowed.
-  extraAllowedHosts: []
-  # -- Additional arguments appended to `mlflow server` (e.g. `["--workers", "2"]`).
-  extraArgs: []
-  # -- Additional environment variables of the MLflow container, as a list of Kubernetes `EnvVar` objects.
-  extraEnv: []
-  service:
-    # -- Service type of MLflow (`ClusterIP`, `NodePort` or `LoadBalancer`, see `service.type`).
-    # kMLOps and the training Jobs always use the in-cluster Service name.
-    type: ClusterIP
-    # -- Service port of MLflow. The container always listens on port 5000.
-    port: 5000
-  persistence:
-    # -- Store the MLflow SQLite database in a PersistentVolumeClaim mounted at `/mlflow`.
-    # If `false`, an `emptyDir` is used and all experiments, runs and registered models are lost when the pod restarts
-    # (the artifacts in MinIO are kept).
-    enabled: true
-    # -- Use an existing PersistentVolumeClaim instead of creating one.
-    existingClaim: ""
-    # -- StorageClass of the created PVC. Leave empty to use the cluster default StorageClass.
-    storageClass: ""
-    # -- Access modes of the created PVC.
-    accessModes:
-      - ReadWriteOnce
-    # -- Requested size of the created PVC.
-    size: 1Gi
-  # -- CPU and memory requests and limits of the MLflow container.
-  resources: {}
-  # -- Liveness probe of MLflow. The `Host: localhost` header is required because MLflow validates the `Host` header.
-  livenessProbe:
-    httpGet:
-      path: /health
-      port: http
-      httpHeaders:
-        - name: Host
-          value: localhost
-    initialDelaySeconds: 30
-    periodSeconds: 20
-    failureThreshold: 3
-  # -- Readiness probe of MLflow.
-  readinessProbe:
-    httpGet:
-      path: /health
-      port: http
-      httpHeaders:
-        - name: Host
-          value: localhost
-    initialDelaySeconds: 10
-    periodSeconds: 10
-    failureThreshold: 3
-  # -- Pod-level security context of MLflow. Empty by default because the official image runs as root.
-  podSecurityContext: {}
-  # -- Container-level security context of MLflow.
-  securityContext: {}
-  # -- Annotations added to the MLflow pod.
-  podAnnotations: {}
-  # -- Node labels used to schedule the MLflow pod.
-  nodeSelector: {}
-  # -- Tolerations of the MLflow pod.
-  tolerations: []
-  # -- Affinity rules of the MLflow pod.
-  affinity: {}
+  artifacts:
+    # -- Where MLflow stores the run artifacts and models. `s3` stores them in a bucket of the object storage configured in
+    # `mlflow.artifacts.s3` (by default the bundled MinIO). `local` stores them on the MLflow volume instead
+    # (increase `mlflow.persistence.size` accordingly); use it if you do not want MLflow to depend on MinIO.
+    backend: s3
+    # The subchart cannot read the kMLOps values, so the object storage is configured here. The defaults point to the
+    # bundled MinIO (`<release>-minio`) and its credentials Secret. When `minio.enabled` is `false`, set them for the
+    # external object storage (or set `mlflow.artifacts.backend` to `local`); rendering fails otherwise.
+    s3:
+      # -- URL (with scheme) of the object storage used by MLflow, rendered with `tpl`.
+      # The default is the in-cluster address of the bundled MinIO.
+      endpoint: "http://{{ .Release.Name }}-minio:9000"
+      # -- Bucket where MLflow stores the artifacts. MLflow creates it at start-up if it does not exist.
+      # Keep it different from `bucketName` (the kMLOps datasets bucket).
+      bucket: mlflow
+      # -- Existing Secret with the object storage credentials, rendered with `tpl`.
+      # The default is the credentials Secret generated by the bundled MinIO.
+      existingSecret: "{{ .Release.Name }}-minio"
+      # -- Key of the access key inside `mlflow.artifacts.s3.existingSecret` (`root-user` for the bundled MinIO).
+      accessKeyKey: root-user
+      # -- Key of the secret key inside `mlflow.artifacts.s3.existingSecret` (`root-password` for the bundled MinIO).
+      secretKeyKey: root-password
 
 # MinIO subchart (cloudpirates/minio), named `<release>-minio`. Stores the kMLOps datasets and the MLflow artifacts.
 # Any value of the subchart can be set here (see the chart README for its documentation).

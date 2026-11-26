@@ -28,6 +28,7 @@ These rules are mandatory. Some existing charts do not comply yet; that does **n
 - **Never** run `git commit`, `git push`, `git checkout -b`, `git branch`, `git switch -c`, `git stash`, `git rebase`, `git merge` or any other command that creates commits or branches or rewrites history.
 - When a change is finished, give the user a ready-to-use commit message in English following [Conventional Commits](https://www.conventionalcommits.org/) (e.g. `feat(opentwinsv2): add configurable resources for events service`). The user commits personally.
 - Read-only git commands (`git status`, `git diff`, `git log`, `git show`) are allowed.
+- `git mv` is allowed to rename or move tracked files so Git records the change as a rename. It only stages the rename; it never creates commits or branches.
 
 ### 2. Do not modify existing charts unless explicitly asked
 - Do not edit, rename, reformat or "clean up" an existing chart unless the user explicitly requests a change to that chart.
@@ -125,7 +126,7 @@ Always run `helm lint` and `helm template` on any chart you create or modify bef
 
 Two project subagents are defined in [.claude/agents/](.claude/agents/):
 
-- **`chart-explorer`** (Haiku): read-only search of files, templates and values across the repository. Use it for locating code and gathering context.
-- **`chart-writer`** (Sonnet): writes and edits chart code (templates, values, Chart.yaml, READMEs) following the rules above.
+- **`explorer`** (Haiku): read-only search of files, templates and values across the repository. Use it for locating code and gathering context. It is the default exploration agent: always use it instead of the built-in `Explore` or `general-purpose` agents for searches in this repository.
+- **`coder`** (Sonnet): writes and edits chart code (templates, values, Chart.yaml, READMEs) following the rules above. It is the default code-writing agent: always use it instead of the built-in `general-purpose` agent for delegated edits in this repository.
 
 Workflow: the main session plans the work and delegates to these agents when useful, then **reviews every result against the hard rules above** (lowercase names, no IPs/URLs/secrets, documented values, professional English, no invented versions, README present, root README list updated, no commits) before reporting to the user. Fix or re-delegate anything that does not comply.

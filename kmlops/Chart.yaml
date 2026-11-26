@@ -33,3 +33,7 @@ dependencies:
     version: ~0.22.1
     repository: "oci://registry-1.docker.io/cloudpirates"
     condition: postgres.enabled
+  - name: mlflow
+    version: 0.0.1
+    repository: "https://ertis-research.github.io/helm-charts/"
+    condition: mlflow.enabled

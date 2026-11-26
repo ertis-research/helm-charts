@@ -5,5 +5,8 @@ dependencies:
 - name: postgres
   repository: oci://registry-1.docker.io/cloudpirates
   version: 0.22.1
-digest: sha256:261a1dac68c7d1095e205f5b3057c4ac1cc429b3eea02d24db96b3c3f0d63bcb
-generated: "2026-11-24T13:46:20.9974559+02:00"
+- name: mlflow
+  repository: https://ertis-research.github.io/helm-charts/
+  version: 0.0.1
+digest: sha256:c38d628aa434d2480f26b1bb11dea1a0aa45142ac103aac4f67b86bf919a1d2d
+generated: "2026-11-25T21:17:17.3324396+02:00"
